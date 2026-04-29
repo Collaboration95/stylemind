@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 from collections.abc import Generator
+from dataclasses import dataclass, field
 from typing import Any
 
 import httpx
@@ -17,12 +18,31 @@ _WELCOME = """
 [bold cyan]StyleMind Fashion Assistant[/bold cyan]
 User ID: [bold]{user_id}[/bold]
 
-Commands:
-  [green]/persona[/green]  — show your current style persona
-  [green]quit[/green] / [green]exit[/green] — exit the chat
-
+Type [green]/help[/green] to see available commands.
 Type your fashion question to get started!
 """
+
+_HELP_TEXT = """
+[bold cyan]Available Commands[/bold cyan]
+
+  [green]/help[/green]        Show this help message
+  [green]/persona[/green]     Show your current inferred style persona
+  [green]/debug-dev[/green]   Show all persona signals extracted this session (dev tool)
+  [green]/clear[/green]       Clear conversation history and start fresh
+  [green]/exit[/green]        Exit the chat (also: /quit, quit, exit)
+"""
+
+
+@dataclass
+class TurnSignals:
+    turn: int
+    liked_aesthetics: list[str] = field(default_factory=list)
+    disliked_materials: list[str] = field(default_factory=list)
+    mentioned_occasions: list[str] = field(default_factory=list)
+    budget_signal: str | None = None
+    color_preferences: list[str] = field(default_factory=list)
+    brand_mentions: list[str] = field(default_factory=list)
+    signal_strength: float = 0.0
 
 
 class ChatCLI:
@@ -32,6 +52,8 @@ class ChatCLI:
         self.explain = explain
         self.console = Console()
         self._history: list[dict[str, str]] = []
+        self._turn_count = 0
+        self._signal_log: list[TurnSignals] = []
 
     # ------------------------------------------------------------------
     # Public entry point
@@ -42,19 +64,36 @@ class ChatCLI:
         while True:
             try:
                 user_input = prompt("You: ").strip()
-            except EOFError, KeyboardInterrupt:
+            except (EOFError, KeyboardInterrupt):
                 self.console.print("\n[dim]Goodbye![/dim]")
                 break
 
             if not user_input:
                 continue
 
-            if user_input.lower() in {"quit", "exit"}:
+            cmd = user_input.lower()
+
+            if cmd in {"quit", "exit", "/quit", "/exit"}:
                 self.console.print("[dim]Goodbye![/dim]")
                 break
 
-            if user_input.lower() == "/persona":
+            if cmd == "/help":
+                self.console.print(_HELP_TEXT)
+                continue
+
+            if cmd == "/persona":
                 self._show_persona()
+                continue
+
+            if cmd == "/debug-dev":
+                self._show_debug_dev()
+                continue
+
+            if cmd == "/clear":
+                self._history.clear()
+                self._turn_count = 0
+                self._signal_log.clear()
+                self.console.print("[dim]Conversation history cleared.[/dim]")
                 continue
 
             self._send_message(user_input)
@@ -64,6 +103,7 @@ class ChatCLI:
     # ------------------------------------------------------------------
 
     def _send_message(self, message: str) -> None:
+        self._turn_count += 1
         payload: dict[str, Any] = {
             "user_id": self.user_id,
             "message": message,
@@ -83,7 +123,6 @@ class ChatCLI:
                 response.raise_for_status()
                 for chunk in self._parse_sse_stream(response):
                     if chunk.startswith("__JSON__"):
-                        # structured response payload
                         self._handle_structured(chunk[8:])
                     else:
                         self.console.print(chunk, end="", highlight=False)
@@ -95,14 +134,12 @@ class ChatCLI:
             self.console.print(f"[red]Connection error: {exc}[/red]")
             return
 
-        self.console.print()  # newline after streamed response
+        self.console.print()
 
-        # Update conversation history
         self._history.append({"role": "user", "content": message})
         self._history.append({"role": "assistant", "content": full_text})
 
     def _parse_sse_stream(self, response: httpx.Response) -> Generator[str]:
-        """Parse SSE data lines from a streaming httpx response."""
         for line in response.iter_lines():
             line = line.strip()
             if not line:
@@ -114,11 +151,10 @@ class ChatCLI:
                 yield data
 
     # ------------------------------------------------------------------
-    # Structured payload handling (products / outfit)
+    # Structured payload handling (products / outfit / signals)
     # ------------------------------------------------------------------
 
     def _handle_structured(self, json_str: str) -> None:
-        """Render product citations, explain breakdowns, and outfit suggestions if present."""
         try:
             payload = json.loads(json_str)
         except json.JSONDecodeError:
@@ -128,6 +164,7 @@ class ChatCLI:
         sources: list[dict[str, Any]] = payload.get("sources", [])
         explain: list[dict[str, Any]] = payload.get("explain", [])
         outfit: dict[str, Any] | None = payload.get("outfit")
+        signals: dict[str, Any] | None = payload.get("signals")
 
         if sources:
             self._render_sources(sources)
@@ -137,6 +174,22 @@ class ChatCLI:
 
         if outfit:
             self._render_outfit(outfit)
+
+        if signals:
+            self._capture_signals(signals)
+
+    def _capture_signals(self, signals: dict[str, Any]) -> None:
+        ts = TurnSignals(
+            turn=self._turn_count,
+            liked_aesthetics=signals.get("liked_aesthetics", []),
+            disliked_materials=signals.get("disliked_materials", []),
+            mentioned_occasions=signals.get("mentioned_occasions", []),
+            budget_signal=signals.get("budget_signal"),
+            color_preferences=signals.get("color_preferences", []),
+            brand_mentions=signals.get("brand_mentions", []),
+            signal_strength=signals.get("signal_strength", 0.0),
+        )
+        self._signal_log.append(ts)
 
     def _render_explain(self, explain: list[dict[str, Any]]) -> None:
         content_lines = []
@@ -244,3 +297,39 @@ class ChatCLI:
             expand=False,
         )
         self.console.print(panel)
+
+    # ------------------------------------------------------------------
+    # /debug-dev — session signal log
+    # ------------------------------------------------------------------
+
+    def _show_debug_dev(self) -> None:
+        if not self._signal_log:
+            self.console.print("[dim]No persona signals extracted yet. Chat first![/dim]")
+            return
+
+        table = Table(
+            title="Persona Signal Log (this session)",
+            show_header=True,
+            header_style="bold yellow",
+        )
+        table.add_column("Turn", justify="right", style="bold")
+        table.add_column("Aesthetics")
+        table.add_column("Materials")
+        table.add_column("Budget")
+        table.add_column("Occasions")
+        table.add_column("Colors")
+        table.add_column("Brands")
+        table.add_column("Strength", justify="right")
+
+        for ts in self._signal_log:
+            aesthetics = ", ".join(f"+{a}" for a in ts.liked_aesthetics) if ts.liked_aesthetics else "[dim]-[/dim]"
+            materials = ", ".join(f"-{m}" for m in ts.disliked_materials) if ts.disliked_materials else "[dim]-[/dim]"
+            budget = ts.budget_signal or "[dim]-[/dim]"
+            occasions = ", ".join(f"+{o}" for o in ts.mentioned_occasions) if ts.mentioned_occasions else "[dim]-[/dim]"
+            colors = ", ".join(ts.color_preferences) if ts.color_preferences else "[dim]-[/dim]"
+            brands = ", ".join(ts.brand_mentions) if ts.brand_mentions else "[dim]-[/dim]"
+            strength = f"{ts.signal_strength:.2f}"
+
+            table.add_row(str(ts.turn), aesthetics, materials, budget, occasions, colors, brands, strength)
+
+        self.console.print(table)
