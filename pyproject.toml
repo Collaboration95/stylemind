@@ -11,6 +11,7 @@ dependencies = [
     "neo4j>=5.20",
     "neo4j-graphrag>=1.5,<2.0",
     "sentence-transformers>=5.0",
+    "transformers>=5.0.0",
     "openai>=1.40",
     "fastapi>=0.115",
     "uvicorn[standard]>=0.30",
