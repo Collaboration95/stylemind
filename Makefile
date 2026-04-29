@@ -67,14 +67,14 @@ health:
 db-up:
 	docker compose up -d neo4j
 	@echo "Waiting for Neo4j healthcheck..."
-	@until docker compose exec neo4j cypher-shell -u neo4j -p "$${NEO4J_PASSWORD:-stylemind_secret}" "RETURN 1" > /dev/null 2>&1; do sleep 2; done
+	@while ! docker compose ps neo4j 2>/dev/null | grep -q "healthy"; do sleep 2; done
 	@echo "Neo4j ready at bolt://localhost:7687 — browser at http://localhost:7474"
 
 db-down:
 	docker compose down neo4j
 
 up:
-	docker compose up --build -d
+	BUILDX_BUILDER=desktop-linux docker compose up --build -d
 	@echo "App: http://localhost:8000  Neo4j: http://localhost:7474  Langfuse: http://localhost:3000"
 
 down:

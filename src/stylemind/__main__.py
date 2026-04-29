@@ -8,6 +8,7 @@ import uuid
 
 import httpx
 import uvicorn
+from dotenv import load_dotenv
 
 from stylemind.cli.chat import ChatCLI
 
@@ -36,15 +37,18 @@ def _wait_for_server(port: int, timeout: int = _HEALTH_TIMEOUT) -> bool:
 
 
 def main() -> None:
+    load_dotenv()
     port = int(os.environ.get("SERVER_PORT", str(_DEFAULT_PORT)))
 
-    thread = threading.Thread(target=_start_server, args=(port,), daemon=True)
-    thread.start()
-
-    print(f"Starting StyleMind server on port {port}...")
-    if not _wait_for_server(port):
-        print(f"ERROR: Server did not start within {_HEALTH_TIMEOUT}s.", file=sys.stderr)
-        sys.exit(1)
+    if _wait_for_server(port, timeout=2):
+        print(f"Connected to existing StyleMind server on port {port}.")
+    else:
+        thread = threading.Thread(target=_start_server, args=(port,), daemon=True)
+        thread.start()
+        print(f"Starting StyleMind server on port {port}...")
+        if not _wait_for_server(port):
+            print(f"ERROR: Server did not start within {_HEALTH_TIMEOUT}s.", file=sys.stderr)
+            sys.exit(1)
 
     user_id = uuid.uuid4().hex[:8]
     base_url = f"http://localhost:{port}"

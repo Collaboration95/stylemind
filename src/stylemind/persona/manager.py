@@ -289,13 +289,13 @@ class PersonaManager:
                         },
                     )
 
-                # Budget signal
+                # Budget signal — stored as plain string; Neo4j can't store Map in property arrays
                 if signals.budget_signal:
                     tx.run(
                         SET_BUDGET_SIGNAL,
                         {
                             "user_id": user_id,
-                            "budget_entry": {"signal": signals.budget_signal, "weight": signals.signal_strength},
+                            "budget_entry": signals.budget_signal,
                         },
                     )
 

@@ -4,10 +4,14 @@ import logging
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-sys.path.insert(0, str(Path(__file__).parent.parent))
+_ROOT = Path(__file__).parent.parent
+sys.path.insert(0, str(_ROOT / "src"))
+sys.path.insert(0, str(_ROOT))
 
-from neo4j import GraphDatabase
+from dotenv import load_dotenv  # noqa: E402
+from neo4j import GraphDatabase  # noqa: E402
+
+load_dotenv(_ROOT / ".env")
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
