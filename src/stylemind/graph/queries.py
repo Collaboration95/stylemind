@@ -186,3 +186,36 @@ COUNT_PRODUCTS = "MATCH (p:Product) RETURN count(p) AS count"
 COUNT_BRANDS = "MATCH (b:Brand) RETURN count(b) AS count"
 COUNT_AESTHETICS = "MATCH (a:Aesthetic) RETURN count(a) AS count"
 COUNT_PAIRS_WITH = "MATCH ()-[:PAIRS_WITH]->() RETURN count(*) AS count"
+
+# ---------------------------------------------------------------------------
+# Vector similarity search (used by ProductRetriever)
+# ---------------------------------------------------------------------------
+
+VECTOR_SEARCH_PRODUCTS = """
+CALL db.index.vector.queryNodes('product_embeddings', $top_k, $embedding)
+YIELD node AS p, score
+WITH p, score
+WHERE score >= $min_threshold
+MATCH (p)-[:BELONGS_TO]->(b:Brand)
+OPTIONAL MATCH (p)-[:EMBODIES]->(a:Aesthetic)
+OPTIONAL MATCH (p)-[:FITS_OCCASION]->(o:Occasion)
+OPTIONAL MATCH (p)-[:IN_COLOR]->(cp:ColorPalette)
+OPTIONAL MATCH (p)-[:BEST_IN_SEASON]->(s:Season)
+OPTIONAL MATCH (p)-[:AT_TIER]->(bt:BudgetTier)
+OPTIONAL MATCH (p)-[:PAIRS_WITH|<-[:PAIRS_WITH]]-(partner:Product)
+WITH p, b, score,
+     collect(DISTINCT a.name) AS aesthetics,
+     collect(DISTINCT o.name) AS occasions,
+     collect(DISTINCT cp.name) AS colors,
+     collect(DISTINCT s.name) AS seasons,
+     collect(DISTINCT partner.product_id) AS pairs_with
+RETURN p.product_id AS product_id,
+       p.name AS name,
+       p.description AS description,
+       p.price_inr AS price,
+       p.category AS category,
+       b.name AS brand,
+       coalesce(bt.label, p.budget_tier) AS budget_tier,
+       aesthetics, occasions, colors, seasons, pairs_with, score
+ORDER BY score DESC
+"""
