@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import json
 import logging
 from collections.abc import AsyncGenerator
 
@@ -53,6 +54,7 @@ async def _sse_stream(
 
     # 3. Rerank with persona signals
     reranked_products = retrieved_products
+    rerank_results: list = []
     if reranker is not None and retrieved_products:
         try:
             rerank_results = reranker.rerank(retrieved_products, persona, explain=chat_request.explain)
@@ -93,6 +95,25 @@ async def _sse_stream(
             yield "data: Sorry, an error occurred while generating the response.\n\n"
     else:
         yield "data: StyleMind generator not available.\n\n"
+
+    # 6. Emit structured JSON events (before [DONE])
+    if reranked_products:
+        sources_payload = [
+            {
+                "product_id": p.product_id,
+                "name": p.name,
+                "brand": p.brand,
+                "price_inr": p.price,
+                "score": p.similarity_score,
+            }
+            for p in reranked_products
+        ]
+        yield f"data: __JSON__{json.dumps({'sources': sources_payload})}\n\n"
+
+    if chat_request.explain and rerank_results:
+        explain_payload = [r.breakdown.to_dict() for r in rerank_results if r.breakdown is not None]
+        if explain_payload:
+            yield f"data: __JSON__{json.dumps({'explain': explain_payload})}\n\n"
 
     yield "data: [DONE]\n\n"
 

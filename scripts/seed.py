@@ -115,6 +115,22 @@ def seed(driver) -> None:  # type: ignore[type-arg]
     )
 
     with driver.session() as session:
+        constraints = [
+            "CREATE CONSTRAINT product_id_unique IF NOT EXISTS FOR (p:Product) REQUIRE p.product_id IS UNIQUE",
+            "CREATE CONSTRAINT brand_name_unique IF NOT EXISTS FOR (b:Brand) REQUIRE b.name IS UNIQUE",
+            "CREATE CONSTRAINT aesthetic_name_unique IF NOT EXISTS FOR (a:Aesthetic) REQUIRE a.name IS UNIQUE",
+            "CREATE CONSTRAINT occasion_name_unique IF NOT EXISTS FOR (o:Occasion) REQUIRE o.name IS UNIQUE",
+            "CREATE CONSTRAINT body_type_name_unique IF NOT EXISTS FOR (bt:BodyType) REQUIRE bt.name IS UNIQUE",
+            "CREATE CONSTRAINT color_name_unique IF NOT EXISTS FOR (cp:ColorPalette) REQUIRE cp.name IS UNIQUE",
+            "CREATE CONSTRAINT material_name_unique IF NOT EXISTS FOR (m:Material) REQUIRE m.name IS UNIQUE",
+            "CREATE CONSTRAINT season_name_unique IF NOT EXISTS FOR (s:Season) REQUIRE s.name IS UNIQUE",
+            "CREATE CONSTRAINT budget_label_unique IF NOT EXISTS FOR (bt:BudgetTier) REQUIRE bt.label IS UNIQUE",
+            "CREATE CONSTRAINT persona_uid_unique IF NOT EXISTS FOR (sp:StylePersona) REQUIRE sp.user_id IS UNIQUE",
+        ]
+        for constraint in constraints:
+            session.run(constraint)
+        logger.info("Created uniqueness constraints count=%d", len(constraints))
+
         # ------------------------------------------------------------------
         # 1. Nodes
         # ------------------------------------------------------------------
@@ -229,10 +245,11 @@ def seed(driver) -> None:  # type: ignore[type-arg]
                 if season:
                     session.run(Q.REL_PRODUCT_BEST_IN_SEASON, {"product_id": pid, "season_name": season})
 
-            # IN_COLOR ColorPalette (take first palette if pipe-separated)
-            cp = p["color_palette"].split("|")[0].strip()
-            if cp:
-                session.run(Q.REL_PRODUCT_IN_COLOR, {"product_id": pid, "palette_name": cp})
+            # IN_COLOR ColorPalette — pipe-separated (create IN_COLOR for each palette)
+            for palette in p["color_palette"].split("|"):
+                palette = palette.strip()
+                if palette and palette in COLOR_PALETTE_METADATA:
+                    session.run(Q.REL_PRODUCT_IN_COLOR, {"product_id": pid, "palette_name": palette})
 
             # AT_TIER BudgetTier
             tier = p["budget_tier"].strip()

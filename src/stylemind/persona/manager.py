@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import math
-from collections import Counter
 from typing import Any
 
 from neo4j import Driver
@@ -57,8 +56,8 @@ SET r.weight = r.weight + $weight, r.last_seen_turn = $turn
 SET_BUDGET_SIGNAL = """
 MATCH (sp:StylePersona {user_id: $user_id})
 SET sp.budget_signals = CASE
-    WHEN sp.budget_signals IS NULL THEN [$budget_signal]
-    ELSE sp.budget_signals + [$budget_signal]
+    WHEN sp.budget_signals IS NULL THEN [$budget_entry]
+    ELSE sp.budget_signals + [$budget_entry]
 END
 """
 
@@ -84,6 +83,12 @@ MATCH (o:Occasion {name: $occasion_name})
 MERGE (sp)-[r:INTERESTED_IN]->(o)
 ON CREATE SET r.weight = 0, r.last_seen_turn = $turn
 SET r.weight = r.weight + $weight, r.last_seen_turn = $turn
+"""
+
+GET_DISLIKED_PRODUCTS = """
+MATCH (sp:StylePersona {user_id: $user_id})
+OPTIONAL MATCH (sp)-[rd:DISLIKES]->(p:Product)
+RETURN collect(DISTINCT p.product_id) AS disliked_product_ids
 """
 
 
@@ -140,11 +145,56 @@ class PersonaManager:
             if name:
                 disliked_materials.append(name)
 
-        # Budget tier: weighted mode (most frequent budget signal)
-        budget_tier: str | None = None
-        if budget_signals:
-            counter = Counter(budget_signals)
-            budget_tier = counter.most_common(1)[0][0]
+        # Fetch occasions with temporal decay (top 3 by decayed weight)
+        top_occasions: list[str] = []
+        try:
+            occ_result = self._driver.execute_query(
+                GET_OCCASIONS_DATA,
+                {"user_id": user_id},
+                database_="neo4j",
+            )
+            occ_records = [record.data() for record in occ_result.records]
+            if occ_records:
+                occasions_raw: list[dict[str, Any]] = occ_records[0].get("occasions") or []
+                decayed_occasions: list[tuple[str, float]] = []
+                for occ in occasions_raw:
+                    occ_name = occ.get("occasion")
+                    occ_weight = occ.get("weight")
+                    occ_last_seen = occ.get("last_seen")
+                    if occ_name is None or occ_weight is None or occ_last_seen is None:
+                        continue
+                    effective = self._apply_decay(float(occ_weight), int(occ_last_seen), turn_count)
+                    decayed_occasions.append((occ_name, effective))
+                decayed_occasions.sort(key=lambda x: x[1], reverse=True)
+                top_occasions = [name for name, _ in decayed_occasions[:3]]
+        except Exception as exc:
+            logger.warning("persona get_occasions query failed user_id=%s error=%s", user_id, exc)
+
+        # Fetch disliked products (no decay — dislikes are persistent)
+        disliked_products: list[str] = []
+        try:
+            dp_result = self._driver.execute_query(
+                GET_DISLIKED_PRODUCTS,
+                {"user_id": user_id},
+                database_="neo4j",
+            )
+            dp_records = [record.data() for record in dp_result.records]
+            if dp_records:
+                disliked_products = dp_records[0].get("disliked_product_ids") or []
+        except Exception as exc:
+            logger.warning("persona get_disliked_products query failed user_id=%s error=%s", user_id, exc)
+
+        # Budget tier: weighted accumulation
+        budget_weights: dict[str, float] = {}
+        for entry in budget_signals:
+            if isinstance(entry, dict):
+                sig = entry.get("signal", "")
+                w = float(entry.get("weight", 1.0))
+            else:
+                sig = str(entry)
+                w = 1.0
+            budget_weights[sig] = budget_weights.get(sig, 0.0) + w
+        budget_tier: str | None = max(budget_weights, key=lambda k: budget_weights[k]) if budget_weights else None
 
         confidence = self._confidence_score(decayed_weights, turn_count)
 
@@ -159,7 +209,8 @@ class PersonaManager:
             preferred_aesthetics=preferred_aesthetics,
             disliked_materials=disliked_materials,
             budget_tier=budget_tier,
-            top_occasions=[],
+            top_occasions=top_occasions,
+            disliked_products=disliked_products,
             confidence_score=confidence,
         )
 
@@ -238,7 +289,10 @@ class PersonaManager:
                 try:
                     self._driver.execute_query(
                         SET_BUDGET_SIGNAL,
-                        {"user_id": user_id, "budget_signal": signals.budget_signal},
+                        {
+                            "user_id": user_id,
+                            "budget_entry": {"signal": signals.budget_signal, "weight": signals.signal_strength},
+                        },
                         database_="neo4j",
                     )
                 except Exception as exc:
