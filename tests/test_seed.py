@@ -89,6 +89,8 @@ def test_compute_overlaps_with() -> None:
 @pytest.mark.unit
 def test_pipe_separated_materials_produce_multiple_entries() -> None:
     """Products with pipe-separated materials should create separate MADE_FROM entries for each."""
+    from seed import parse_csv  # type: ignore[import]
+
     from data.enrichment import MATERIAL_METADATA
 
     csv_path = Path("data/products_seed.csv")
