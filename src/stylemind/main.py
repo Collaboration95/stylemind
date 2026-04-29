@@ -114,12 +114,17 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # CORS (permissive for dev; tighten in prod via env)
+    # CORS — restrict via CORS_ORIGINS env var (comma-separated).
+    # Defaults to wildcard for local dev; always set explicitly in production.
+    import os
+
+    _raw_origins = os.environ.get("CORS_ORIGINS", "*")
+    _allow_origins = [o.strip() for o in _raw_origins.split(",") if o.strip()]
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_origins=_allow_origins,
+        allow_methods=["GET", "POST"],
+        allow_headers=["Content-Type", "Accept", "Authorization"],
     )
 
     # Request-ID logging middleware
