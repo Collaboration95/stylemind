@@ -62,9 +62,7 @@ def _format_outfit_context(outfit: OutfitSuggestion) -> str:
         f"  Anchor: {outfit.anchor.name} by {outfit.anchor.brand} — ₹{outfit.anchor.price_inr:,}",
     ]
     for item in outfit.items:
-        lines.append(
-            f"  + {item.name} by {item.brand} — ₹{item.price_inr:,} ({item.category}): {item.justification}"
-        )
+        lines.append(f"  + {item.name} by {item.brand} — ₹{item.price_inr:,} ({item.category}): {item.justification}")
     return "\n".join(lines)
 
 
