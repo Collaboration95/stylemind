@@ -221,3 +221,39 @@ RETURN p.product_id AS product_id,
        aesthetics, occasions, colors, seasons, materials, pairs_with, score
 ORDER BY score DESC
 """
+
+# Aesthetic fallback: find matching aesthetics, then expand to products
+VECTOR_SEARCH_AESTHETIC_FALLBACK = """
+CALL db.index.vector.queryNodes('aesthetic_embeddings', $top_k_aesthetics, $embedding)
+YIELD node AS a, score AS aesthetic_score
+WITH a, aesthetic_score
+WHERE aesthetic_score >= $min_threshold
+ORDER BY aesthetic_score DESC
+LIMIT 3
+MATCH (p:Product)-[:EMBODIES]->(a)
+MATCH (p)-[:BELONGS_TO]->(b:Brand)
+OPTIONAL MATCH (p)-[:EMBODIES]->(a2:Aesthetic)
+OPTIONAL MATCH (p)-[:FITS_OCCASION]->(o:Occasion)
+OPTIONAL MATCH (p)-[:IN_COLOR]->(cp:ColorPalette)
+OPTIONAL MATCH (p)-[:BEST_IN_SEASON]->(s:Season)
+OPTIONAL MATCH (p)-[:AT_TIER]->(bt:BudgetTier)
+OPTIONAL MATCH (p)-[:MADE_FROM]->(m:Material)
+OPTIONAL MATCH (p)-[:PAIRS_WITH]-(partner:Product)
+WITH p, b, bt, aesthetic_score AS score,
+     collect(DISTINCT a2.name) AS aesthetics,
+     collect(DISTINCT o.name) AS occasions,
+     collect(DISTINCT cp.name) AS colors,
+     collect(DISTINCT s.name) AS seasons,
+     collect(DISTINCT m.name) AS materials,
+     collect(DISTINCT partner.product_id) AS pairs_with
+RETURN p.product_id AS product_id,
+       p.name AS name,
+       p.description AS description,
+       p.price_inr AS price_inr,
+       p.category AS category,
+       b.name AS brand,
+       coalesce(bt.label, p.budget_tier) AS budget_tier,
+       aesthetics, occasions, colors, seasons, materials, pairs_with, score
+ORDER BY score DESC
+LIMIT $top_k
+"""
