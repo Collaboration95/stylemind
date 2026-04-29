@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+
 from data.enrichment import (
     AESTHETIC_METADATA,
     BODY_TYPE_METADATA,
