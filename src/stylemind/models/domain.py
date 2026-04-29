@@ -23,7 +23,6 @@ class ProductRecord:
     pairs_with: str  # pipe-separated product IDs
 
 
-
 @dataclass(frozen=True)
 class RetrievedProduct:
     """Product returned by vector search with expanded graph relationships."""
@@ -58,4 +57,3 @@ class PersonaSignals:
     def __post_init__(self) -> None:
         if not (0.0 <= self.signal_strength <= 1.0):
             raise ValueError(f"signal_strength must be in [0.0, 1.0], got {self.signal_strength}")
-

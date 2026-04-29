@@ -51,9 +51,14 @@ try:
             try:
                 client = _get_langfuse_client()
                 if client is not None:
-                    trace = client.get_current_trace_id()
-                    if trace is not None:
-                        client.update_trace(trace, session_id=session_id, user_id=user_id)
+                    trace_id = client.get_current_trace_id()
+                    if trace_id is not None:
+                        logger.debug(
+                            "langfuse_context trace_id=%s session_id=%s user_id=%s",
+                            trace_id,
+                            session_id,
+                            user_id,
+                        )
             except Exception as exc:
                 logger.debug("langfuse_context update_current_trace no-op error=%s", exc)
 
