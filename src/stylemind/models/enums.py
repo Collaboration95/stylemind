@@ -4,6 +4,8 @@ from enum import StrEnum
 
 
 class BudgetTier(StrEnum):
+    """Product price tier classification."""
+
     BUDGET = "Budget"
     MID = "Mid"
     PREMIUM = "Premium"
@@ -11,6 +13,8 @@ class BudgetTier(StrEnum):
 
 
 class Occasion(StrEnum):
+    """Fashion-appropriate occasion categories."""
+
     CASUAL = "Casual"
     OFFICE = "Office"
     DATE_NIGHT = "Date Night"
@@ -20,6 +24,8 @@ class Occasion(StrEnum):
 
 
 class Aesthetic(StrEnum):
+    """Fashion aesthetic style categories."""
+
     OLD_MONEY = "Old Money"
     QUIET_LUXURY = "Quiet Luxury"
     COASTAL_GRANDMA = "Coastal Grandma"
@@ -32,12 +38,16 @@ class Aesthetic(StrEnum):
 
 
 class Season(StrEnum):
+    """Seasonal classification for fashion items."""
+
     SS = "SS"
     AW = "AW"
     YEAR_ROUND = "Year-round"
 
 
 class Category(StrEnum):
+    """Product category classification."""
+
     TOPS = "Tops"
     BOTTOMS = "Bottoms"
     FOOTWEAR = "Footwear"
@@ -48,6 +58,8 @@ class Category(StrEnum):
 
 
 class BodyType(StrEnum):
+    """Body type fit classification."""
+
     ALL = "All"
     HOURGLASS = "Hourglass"
     ATHLETIC = "Athletic"
@@ -57,6 +69,8 @@ class BodyType(StrEnum):
 
 
 class ColorPalette(StrEnum):
+    """Named color palette groupings for products."""
+
     CLASSIC_NEUTRALS = "Classic Neutrals"
     EARTHY_NEUTRALS = "Earthy Neutrals"
     SOFT_WHITES = "Soft Whites"

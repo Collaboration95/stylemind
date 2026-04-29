@@ -5,8 +5,8 @@ import time
 
 import pytest
 
-from stylemind.models.domain import RetrievedProduct
-from stylemind.models.schemas import PersonaSignals, PersonaSnapshot
+from stylemind.models.domain import PersonaSignals, RetrievedProduct
+from stylemind.models.schemas import PersonaSnapshot
 from stylemind.rag.reranker import ProductReranker
 
 # ---------------------------------------------------------------------------
@@ -33,7 +33,7 @@ def _make_10_products() -> list[RetrievedProduct]:
             product_id=f"P{i:03d}",
             name=f"Test Product {i}",
             description=f"A test product description number {i} with some detail",
-            price=1000 + i * 500,
+            price_inr=1000 + i * 500,
             category="Tops" if i % 2 == 0 else "Bottoms",
             brand="COS" if i % 3 == 0 else "Arket",
             budget_tier="Mid",

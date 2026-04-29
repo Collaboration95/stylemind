@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import threading
 from dataclasses import dataclass
+from typing import Literal
 
 
 def get_required_variable(name: str) -> str:
@@ -20,6 +21,8 @@ def get_optional_variable(name: str, default: str) -> str:
 
 @dataclass(frozen=True)
 class Neo4jConfig:
+    """Neo4j database connection settings."""
+
     uri: str
     user: str
     password: str
@@ -35,6 +38,8 @@ class Neo4jConfig:
 
 @dataclass(frozen=True)
 class ChatLLMConfig:
+    """Chat LLM provider settings (Groq, OpenAI-compatible)."""
+
     base_url: str
     api_key: str
     model: str
@@ -52,6 +57,8 @@ class ChatLLMConfig:
 
 @dataclass(frozen=True)
 class ExtractionLLMConfig:
+    """Extraction LLM provider settings for structured persona signal extraction."""
+
     base_url: str
     api_key: str
     model: str
@@ -67,14 +74,16 @@ class ExtractionLLMConfig:
 
 @dataclass(frozen=True)
 class EmbeddingConfig:
-    provider: str  # "local" or "openai"
+    """Embedding model settings (local sentence-transformers or OpenAI)."""
+
+    provider: Literal["local", "openai"]
     model_name: str
     dimensions: int
 
     @classmethod
     def from_env(cls) -> EmbeddingConfig:
         return cls(
-            provider=get_optional_variable("EMBEDDING_PROVIDER", "local"),
+            provider=get_optional_variable("EMBEDDING_PROVIDER", "local"),  # type: ignore[arg-type]
             model_name=get_optional_variable("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2"),
             dimensions=int(get_optional_variable("EMBEDDING_DIMENSIONS", "384")),
         )
@@ -97,11 +106,28 @@ class LangfuseConfig:
 
 @dataclass(frozen=True)
 class AppSettings:
+    """Application-level tuning parameters with range validation."""
+
     log_level: str
     vector_top_k: int
     persona_decay_rate: float
     expected_signals_per_turn: float
     min_similarity_threshold: float
+
+    def __post_init__(self) -> None:
+        assert self.log_level in ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"), (
+            f"Invalid log_level: {self.log_level}"
+        )
+        assert self.vector_top_k > 0, f"vector_top_k must be > 0, got {self.vector_top_k}"
+        assert 0.0 < self.persona_decay_rate < 1.0, (
+            f"persona_decay_rate must be in (0, 1), got {self.persona_decay_rate}"
+        )
+        assert self.expected_signals_per_turn > 0.0, (
+            f"expected_signals_per_turn must be > 0, got {self.expected_signals_per_turn}"
+        )
+        assert 0.0 <= self.min_similarity_threshold <= 1.0, (
+            f"min_similarity_threshold must be in [0, 1], got {self.min_similarity_threshold}"
+        )
 
     @classmethod
     def from_env(cls) -> AppSettings:
@@ -116,6 +142,8 @@ class AppSettings:
 
 @dataclass(frozen=True)
 class AppConfig:
+    """Root application configuration aggregating all sub-configs."""
+
     neo4j: Neo4jConfig
     chat_llm: ChatLLMConfig
     extraction_llm: ExtractionLLMConfig

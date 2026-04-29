@@ -18,7 +18,7 @@ def _row_to_retrieved_product(row: dict[str, Any]) -> RetrievedProduct:
         product_id=row["product_id"],
         name=row["name"],
         description=row["description"] or "",
-        price=row["price"] or 0,
+        price_inr=row["price_inr"] or 0,
         category=row["category"] or "",
         brand=row["brand"] or "",
         budget_tier=row["budget_tier"] or "",
