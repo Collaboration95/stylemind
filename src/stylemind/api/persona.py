@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from fastapi import APIRouter, Request
@@ -23,7 +24,7 @@ async def get_persona(user_id: str, request: Request) -> PersonaSnapshot:
         return PersonaSnapshot()
 
     try:
-        snapshot = persona_manager.get_persona(user_id)
+        snapshot = await asyncio.to_thread(persona_manager.get_persona, user_id)
         logger.info("persona get_persona user_id=%s confidence=%.2f", user_id, snapshot.confidence_score)
         return snapshot
     except Exception as exc:
