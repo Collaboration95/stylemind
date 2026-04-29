@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 from collections.abc import AsyncGenerator
 
@@ -8,6 +9,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 
 from stylemind.models.schemas import ChatRequest, PersonaSnapshot
+from stylemind.observability import langfuse_context, score_persona_confidence
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +29,11 @@ async def _sse_stream(
     persona_manager = getattr(state, "persona_manager", None)
     inference_engine = getattr(state, "inference_engine", None)
     outfit_builder = getattr(state, "outfit_builder", None)
+
+    # Set Langfuse session_id so all spans for this user are grouped together
+    if langfuse_context is not None:
+        with contextlib.suppress(Exception):
+            langfuse_context.update_current_trace(session_id=chat_request.user_id, user_id=chat_request.user_id)
 
     # 1. Get current persona (returns empty default on first turn, never None)
     persona: PersonaSnapshot = PersonaSnapshot()
@@ -102,6 +109,14 @@ async def _sse_stream(
                 )
                 persona_manager.update_persona(chat_request.user_id, signals)
                 logger.info("chat persona updated user_id=%s", chat_request.user_id)
+
+                # Log persona confidence as a custom Langfuse score
+                updated_persona = persona_manager.get_persona(chat_request.user_id)
+                score_persona_confidence(
+                    user_id=chat_request.user_id,
+                    confidence=updated_persona.confidence_score,
+                    session_id=chat_request.user_id,
+                )
             except Exception as exc:
                 logger.warning("chat persona update failed user_id=%s error=%s", chat_request.user_id, exc)
 
