@@ -29,7 +29,7 @@ def _wait_for_server(port: int, timeout: int = _HEALTH_TIMEOUT) -> bool:
             resp = httpx.get(url, timeout=2.0)
             if resp.status_code == 200:
                 return True
-        except httpx.ConnectError, httpx.TimeoutException, httpx.ReadError:
+        except (httpx.ConnectError, httpx.TimeoutException, httpx.ReadError):
             pass
         time.sleep(_HEALTH_POLL_INTERVAL)
     return False
