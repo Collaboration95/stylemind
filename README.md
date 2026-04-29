@@ -30,7 +30,7 @@ flowchart TD
 ## Quick Start
 
 ```bash
-cp .env.example .env        # edit .env — add GROQ_API_KEY and OPENAI_API_KEY
+cp .env.example .env        # edit .env — set CHAT_API_KEY (Groq) and EXTRACTION_API_KEY (OpenAI)
 docker-compose up --build   # seed + embed scripts run automatically on startup
 ```
 
