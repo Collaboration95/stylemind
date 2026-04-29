@@ -84,3 +84,20 @@ def test_compute_overlaps_with() -> None:
         assert isinstance(a, str)
         assert isinstance(b, str)
         assert a != b, f"Self-overlap detected: {a}"
+
+
+@pytest.mark.unit
+def test_pipe_separated_materials_produce_multiple_entries() -> None:
+    """Products with pipe-separated materials should create separate MADE_FROM entries for each."""
+    from seed import parse_csv  # type: ignore[import]
+
+    from data.enrichment import MATERIAL_METADATA
+
+    csv_path = Path("data/products_seed.csv")
+    products = parse_csv(csv_path)
+    pipe_products = [p for p in products if "|" in p["material"]]
+    assert len(pipe_products) > 0, "Expected at least one product with pipe-separated materials"
+    for p in pipe_products:
+        materials = [m.strip() for m in p["material"].split("|")]
+        for mat in materials:
+            assert mat in MATERIAL_METADATA, f"Material {mat!r} not in MATERIAL_METADATA (product {p['product_id']})"

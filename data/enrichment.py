@@ -261,6 +261,19 @@ MATERIAL_METADATA: dict[str, dict] = {
     "Wool Crepe": {"name": "Wool Crepe", "parent_material": "Wool", "sustainability_score": 4, "feel_tag": "draped"},
     "Silk Satin": {"name": "Silk Satin", "parent_material": "Silk", "sustainability_score": 3, "feel_tag": "smooth"},
     "Silk Blend": {"name": "Silk Blend", "parent_material": "Silk", "sustainability_score": 3, "feel_tag": "luxurious"},
+    "Rubber": {"name": "Rubber", "parent_material": "Rubber", "sustainability_score": 2, "feel_tag": "flexible"},
+    "Jute": {"name": "Jute", "parent_material": "Jute", "sustainability_score": 5, "feel_tag": "natural"},
+    "Straw": {"name": "Straw", "parent_material": "Straw", "sustainability_score": 5, "feel_tag": "woven"},
+    "Raffia": {"name": "Raffia", "parent_material": "Raffia", "sustainability_score": 5, "feel_tag": "textured"},
+    "Foam": {"name": "Foam", "parent_material": "Foam", "sustainability_score": 1, "feel_tag": "cushioned"},
+    "Freshwater Pearl": {"name": "Freshwater Pearl", "parent_material": "Pearl", "sustainability_score": 3, "feel_tag": "lustrous"},
+    "Gold": {"name": "Gold", "parent_material": "Metal", "sustainability_score": 3, "feel_tag": "precious"},
+    "Faux Leather": {"name": "Faux Leather", "parent_material": "Synthetic", "sustainability_score": 1, "feel_tag": "structured"},
+    "Recycled Nylon": {"name": "Recycled Nylon", "parent_material": "Nylon", "sustainability_score": 4, "feel_tag": "durable"},
+    "Merino Wool": {"name": "Merino Wool", "parent_material": "Wool", "sustainability_score": 4, "feel_tag": "ultra-soft"},
+    "Acrylic Blend": {"name": "Acrylic Blend", "parent_material": "Acrylic", "sustainability_score": 2, "feel_tag": "soft"},
+    "Viscose Knit": {"name": "Viscose Knit", "parent_material": "Viscose", "sustainability_score": 2, "feel_tag": "stretchy"},
+    "Organic Canvas": {"name": "Organic Canvas", "parent_material": "Cotton", "sustainability_score": 4, "feel_tag": "durable"},
 }
 
 OCCASION_METADATA: dict[str, dict] = {
