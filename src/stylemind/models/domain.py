@@ -5,6 +5,8 @@ from dataclasses import dataclass, field
 
 @dataclass(frozen=True)
 class ProductRecord:
+    """Raw product row from the seed CSV, before graph insertion."""
+
     product_id: str
     name: str
     category: str
@@ -22,25 +24,13 @@ class ProductRecord:
 
 
 @dataclass(frozen=True)
-class BrandRecord:
-    name: str
-    tier: str
-    country_of_origin: str
-
-
-@dataclass(frozen=True)
-class AestheticRecord:
-    name: str
-    description: str
-    keywords: list[str] = field(default_factory=list)
-
-
-@dataclass(frozen=True)
 class RetrievedProduct:
+    """Product returned by vector search with expanded graph relationships."""
+
     product_id: str
     name: str
     description: str
-    price: int
+    price_inr: int
     category: str
     brand: str
     budget_tier: str
@@ -54,24 +44,16 @@ class RetrievedProduct:
 
 
 @dataclass(frozen=True)
-class OutfitItem:
-    product_id: str
-    name: str
-    category: str
-    brand: str
-    price_inr: int
-    justification: str
-    graph_path: str
+class PersonaSignals:
+    liked_aesthetics: list[str] = field(default_factory=list)
+    disliked_materials: list[str] = field(default_factory=list)
+    mentioned_occasions: list[str] = field(default_factory=list)
+    budget_signal: str | None = None
+    color_preferences: list[str] = field(default_factory=list)
+    brand_mentions: list[str] = field(default_factory=list)
+    sentiment_on_shown: dict[str, str] = field(default_factory=dict)
+    signal_strength: float = 0.5
 
-
-@dataclass(frozen=True)
-class ConversationTurn:
-    role: str  # "user" or "assistant"
-    content: str
-
-
-@dataclass(frozen=True)
-class ConversationState:
-    user_id: str
-    history: list[ConversationTurn] = field(default_factory=list)
-    turn_count: int = 0
+    def __post_init__(self) -> None:
+        if not (0.0 <= self.signal_strength <= 1.0):
+            raise ValueError(f"signal_strength must be in [0.0, 1.0], got {self.signal_strength}")

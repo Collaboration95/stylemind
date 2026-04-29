@@ -6,7 +6,7 @@ import logging
 from openai import OpenAI
 
 from stylemind.config import ExtractionLLMConfig
-from stylemind.models.schemas import PersonaSignals
+from stylemind.models.domain import PersonaSignals
 from stylemind.observability import observe
 
 logger = logging.getLogger(__name__)
@@ -134,7 +134,7 @@ class PersonaInferenceEngine:
 
             raw_content = response.choices[0].message.content or "{}"
             data = json.loads(raw_content)
-            signals = PersonaSignals.model_validate(data)
+            signals = PersonaSignals(**data)
 
             logger.info(
                 "persona signals extracted signal_strength=%.2f liked_aesthetics=%s",

@@ -49,20 +49,16 @@ try:
         def update_current_trace(self, *, session_id: str | None = None, user_id: str | None = None) -> None:
             """Update the current trace attributes (no-op if not inside an @observe span)."""
             try:
-                # In v4, session/user context is set via propagate_attributes or
-                # directly on the current OTel span attributes.
-                # The recommended approach for updating the ongoing trace is through
-                # the span's OTEL attributes that Langfuse maps to its trace.
-                from langfuse import propagate_attributes
-
-                # propagate_attributes is a context manager; outside a trace context
-                # it is effectively a no-op (Langfuse will associate these baggage
-                # attributes with the current trace when inside an @observe span).
-                if session_id or user_id:
-                    ctx = propagate_attributes(session_id=session_id, user_id=user_id, as_baggage=True)
-                    ctx.__enter__()
-                    # We intentionally do NOT __exit__ here so the baggage stays
-                    # active for the lifetime of this call stack.
+                client = _get_langfuse_client()
+                if client is not None:
+                    trace_id = client.get_current_trace_id()
+                    if trace_id is not None:
+                        logger.debug(
+                            "langfuse_context trace_id=%s session_id=%s user_id=%s",
+                            trace_id,
+                            session_id,
+                            user_id,
+                        )
             except Exception as exc:
                 logger.debug("langfuse_context update_current_trace no-op error=%s", exc)
 

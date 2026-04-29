@@ -5,7 +5,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from stylemind.models.schemas import PersonaSignals, PersonaSnapshot
+from stylemind.models.domain import PersonaSignals
+from stylemind.models.schemas import PersonaSnapshot
 from stylemind.persona.manager import PersonaManager
 
 # ---------------------------------------------------------------------------

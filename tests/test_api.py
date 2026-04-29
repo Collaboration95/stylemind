@@ -58,7 +58,7 @@ def _make_app_with_mocks(
 
     # --- PersonaInferenceEngine mock ---
     mock_inference = MagicMock()
-    from stylemind.models.schemas import PersonaSignals
+    from stylemind.models.domain import PersonaSignals
 
     mock_inference.extract_signals = MagicMock(return_value=PersonaSignals())
     test_app.state.inference_engine = mock_inference
@@ -230,7 +230,7 @@ def _make_products():
             product_id="P001",
             name="Linen Trouser",
             description="test",
-            price=4200,
+            price_inr=4200,
             category="Bottoms",
             brand="COS",
             budget_tier="Mid",
@@ -245,7 +245,7 @@ def _make_products():
             product_id="P005",
             name="Ribbed Polo",
             description="test",
-            price=1800,
+            price_inr=1800,
             category="Tops",
             brand="Uniqlo",
             budget_tier="Budget",
@@ -386,3 +386,30 @@ def test_score_breakdown_to_dict():
     assert d["penalty"] == pytest.approx(0.0)
     assert d["budget_boost"] == pytest.approx(0.02)
     assert d["final_score"] == pytest.approx(0.91)
+
+
+@pytest.mark.unit
+def test_health_returns_503_when_embedder_down():
+    """GET /health returns 503 when embedder is not loaded."""
+    app = _make_app_with_mocks(neo4j_ok=True, embedder_ok=False)
+    client = TestClient(app, raise_server_exceptions=True)
+
+    response = client.get("/health")
+
+    assert response.status_code == 503
+    data = response.json()
+    assert data["embedder"] is False
+
+
+@pytest.mark.unit
+def test_chat_when_generator_is_none():
+    """POST /chat when generator is None returns graceful error message."""
+    app = _make_app_with_mocks(stream_chunks=["Hello"])
+
+    app.state.generator = None
+
+    client = TestClient(app, raise_server_exceptions=True)
+    response = client.post("/chat", json={"user_id": "u1", "message": "hello"})
+
+    assert response.status_code == 200
+    assert "not available" in response.text.lower() or "StyleMind generator not available" in response.text

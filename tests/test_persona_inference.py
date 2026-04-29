@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from stylemind.models.schemas import PersonaSignals
+from stylemind.models.domain import PersonaSignals
 from stylemind.persona.inference import PersonaInferenceEngine
 
 # ---------------------------------------------------------------------------
