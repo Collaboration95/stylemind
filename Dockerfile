@@ -23,8 +23,9 @@ COPY data/ data/
 
 ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONPATH="/app/src"
+ENV HF_HOME="/app/.cache/huggingface"
 
-RUN chown -R appuser:appuser /app
+RUN mkdir -p /app/.cache && chown -R appuser:appuser /app
 
 USER appuser
 
