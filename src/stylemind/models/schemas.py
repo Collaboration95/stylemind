@@ -49,6 +49,7 @@ class PersonaSnapshot(BaseModel):
 
     preferred_aesthetics: list[str] = Field(default_factory=list)
     disliked_materials: list[str] = Field(default_factory=list)
+    disliked_products: list[str] = Field(default_factory=list)
     budget_tier: str | None = None
     top_occasions: list[str] = Field(default_factory=list)
     disliked_products: list[str] = Field(default_factory=list)
