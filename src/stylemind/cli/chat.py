@@ -118,7 +118,7 @@ class ChatCLI:
     # ------------------------------------------------------------------
 
     def _handle_structured(self, json_str: str) -> None:
-        """Render product citations and outfit suggestions if present."""
+        """Render product citations, explain breakdowns, and outfit suggestions if present."""
         try:
             payload = json.loads(json_str)
         except json.JSONDecodeError:
@@ -126,13 +126,37 @@ class ChatCLI:
             return
 
         sources: list[dict[str, Any]] = payload.get("sources", [])
+        explain: list[dict[str, Any]] = payload.get("explain", [])
         outfit: dict[str, Any] | None = payload.get("outfit")
 
         if sources:
             self._render_sources(sources)
 
+        if explain:
+            self._render_explain(explain)
+
         if outfit:
             self._render_outfit(outfit)
+
+    def _render_explain(self, explain: list[dict[str, Any]]) -> None:
+        content_lines = []
+        for e in explain:
+            pid = e.get("product_id", "?")
+            base = e.get("base_score", 0.0)
+            boost = e.get("persona_boost", 0.0)
+            penalty = e.get("penalty", 0.0)
+            budget = e.get("budget_boost", 0.0)
+            final = e.get("final_score", 0.0)
+            content_lines.append(
+                f"• [bold]{pid}[/bold]  base={base:.3f}  boost={boost:+.3f}  penalty={penalty:+.3f}  budget={budget:+.3f}  →  [cyan]{final:.3f}[/cyan]"
+            )
+
+        panel = Panel(
+            "\n".join(content_lines),
+            title="[bold yellow]Score Breakdown[/bold yellow]",
+            expand=False,
+        )
+        self.console.print(panel)
 
     def _render_sources(self, sources: list[dict[str, Any]]) -> None:
         content_lines = []
