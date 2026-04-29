@@ -101,11 +101,13 @@ def test_coherence_rejects_season_clash():
     """
     # Simulate: PAIRS_WITH query returns [] (AW candidate filtered by Cypher)
     # Fallback query also returns [] (no aesthetic overlap either)
-    driver = _make_driver([
-        [_anchor_row(seasons=["SS"])],  # GET_ANCHOR_PRODUCT
-        [],  # GET_PAIRS_WITH_COHERENT → empty (AW candidate excluded)
-        [],  # GET_AESTHETIC_FALLBACK → empty
-    ])
+    driver = _make_driver(
+        [
+            [_anchor_row(seasons=["SS"])],  # GET_ANCHOR_PRODUCT
+            [],  # GET_PAIRS_WITH_COHERENT → empty (AW candidate excluded)
+            [],  # GET_AESTHETIC_FALLBACK → empty
+        ]
+    )
     builder = OutfitBuilder(driver)
     outfit = builder.build_outfit("P001", "user1")
 
@@ -118,11 +120,13 @@ def test_coherence_rejects_season_clash():
 @pytest.mark.unit
 def test_coherence_rejects_occasion_clash():
     """Office anchor + Active-only candidate → candidate excluded (empty results)."""
-    driver = _make_driver([
-        [_anchor_row(occasions=["Office"])],  # anchor
-        [],  # PAIRS_WITH empty (Active candidate filtered by Cypher)
-        [],  # fallback empty
-    ])
+    driver = _make_driver(
+        [
+            [_anchor_row(occasions=["Office"])],  # anchor
+            [],  # PAIRS_WITH empty (Active candidate filtered by Cypher)
+            [],  # fallback empty
+        ]
+    )
     builder = OutfitBuilder(driver)
     outfit = builder.build_outfit("P001", "user1")
 
@@ -140,10 +144,12 @@ def test_category_diversification_max_one_per_slot():
     top_candidate_2 = _candidate_row(product_id="P003", name="Another Top", category="Tops")
     bottom_candidate = _candidate_row(product_id="P004", name="Good Bottom", category="Bottoms")
 
-    driver = _make_driver([
-        [anchor],
-        [top_candidate_1, top_candidate_2, bottom_candidate],  # PAIRS_WITH returns all
-    ])
+    driver = _make_driver(
+        [
+            [anchor],
+            [top_candidate_1, top_candidate_2, bottom_candidate],  # PAIRS_WITH returns all
+        ]
+    )
     builder = OutfitBuilder(driver)
     outfit = builder.build_outfit("P001", "user1")
 
@@ -160,11 +166,13 @@ def test_fallback_triggers_when_no_pairs_with():
     anchor = _anchor_row()
     fallback_item = _candidate_row(product_id="P010", path_type="aesthetic_similarity")
 
-    driver = _make_driver([
-        [anchor],   # GET_ANCHOR_PRODUCT
-        [],         # GET_PAIRS_WITH_COHERENT → empty → triggers fallback
-        [fallback_item],  # GET_AESTHETIC_FALLBACK
-    ])
+    driver = _make_driver(
+        [
+            [anchor],  # GET_ANCHOR_PRODUCT
+            [],  # GET_PAIRS_WITH_COHERENT → empty → triggers fallback
+            [fallback_item],  # GET_AESTHETIC_FALLBACK
+        ]
+    )
     builder = OutfitBuilder(driver)
     outfit = builder.build_outfit("P001", "user1")
 
@@ -195,12 +203,16 @@ def test_persona_ranking_prefers_matching_aesthetics():
     """Candidates matching persona aesthetics should rank before non-matching ones."""
     anchor = _anchor_row()
     matching = _candidate_row(product_id="P002", category="Bottoms", aesthetics=["Old Money"])
-    non_matching = _candidate_row(product_id="P003", name="Unrelated Shoes", category="Footwear", aesthetics=["Streetwear"])
+    non_matching = _candidate_row(
+        product_id="P003", name="Unrelated Shoes", category="Footwear", aesthetics=["Streetwear"]
+    )
 
-    driver = _make_driver([
-        [anchor],
-        [non_matching, matching],  # non-matching returned first by Cypher
-    ])
+    driver = _make_driver(
+        [
+            [anchor],
+            [non_matching, matching],  # non-matching returned first by Cypher
+        ]
+    )
     persona = PersonaSnapshot(preferred_aesthetics=["Old Money"])
     builder = OutfitBuilder(driver)
     outfit = builder.build_outfit("P001", "user1", persona=persona)
@@ -218,10 +230,12 @@ def test_outfit_items_respect_max_count():
         _candidate_row(product_id=f"P{i:03d}", name=f"Item {i}", category=f"Cat{i}")
         for i in range(2, 10)  # 8 candidates
     ]
-    driver = _make_driver([
-        [anchor],
-        candidates,
-    ])
+    driver = _make_driver(
+        [
+            [anchor],
+            candidates,
+        ]
+    )
     builder = OutfitBuilder(driver)
     outfit = builder.build_outfit("P001", "user1")
 
@@ -232,11 +246,13 @@ def test_outfit_items_respect_max_count():
 def test_outfit_anchor_summary_populated():
     """Anchor ProductSummary fields are correctly populated."""
     anchor = _anchor_row(product_id="P001", name="Nice Top", brand="Zara", price_inr=2000)
-    driver = _make_driver([
-        [anchor],
-        [],  # no PAIRS_WITH
-        [],  # no fallback
-    ])
+    driver = _make_driver(
+        [
+            [anchor],
+            [],  # no PAIRS_WITH
+            [],  # no fallback
+        ]
+    )
     builder = OutfitBuilder(driver)
     outfit = builder.build_outfit("P001", "user1")
 
@@ -257,19 +273,27 @@ def test_build_outfit_p012_integration():
     import os
 
     from neo4j import GraphDatabase
+    from neo4j.exceptions import ServiceUnavailable
+
+    password = os.getenv("NEO4J_PASSWORD")
+    if not password:
+        pytest.skip("NEO4J_PASSWORD not set; skipping integration test")
 
     uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
     user = os.getenv("NEO4J_USER", "neo4j")
-    password = os.getenv("NEO4J_PASSWORD", "password")
 
-    driver = GraphDatabase.driver(uri, auth=(user, password))
+    try:
+        driver = GraphDatabase.driver(uri, auth=(user, password))
+        driver.verify_connectivity()
+    except ServiceUnavailable:
+        pytest.skip("Neo4j not reachable; skipping integration test")
+
     try:
         builder = OutfitBuilder(driver)
         outfit = builder.build_outfit("P012", "integration_test_user")
         assert isinstance(outfit, OutfitSuggestion)
         assert outfit.anchor.product_id == "P012"
         assert isinstance(outfit.items, list)
-        # Each item must have a valid graph_path
         for item in outfit.items:
             assert "P012" in item.graph_path
             assert "-PAIRS_WITH->" in item.graph_path or "~aesthetic~" in item.graph_path

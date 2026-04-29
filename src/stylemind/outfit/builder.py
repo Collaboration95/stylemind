@@ -95,7 +95,21 @@ MAX_OUTFIT_ITEMS = 4
 
 
 class OutfitBuilder:
-    CATEGORY_SLOTS = ["Top", "Tops", "Bottom", "Bottoms", "Footwear", "Bag", "Bags", "Accessory", "Accessories", "Outerwear", "Dress", "Dresses", "Jumpsuit"]
+    CATEGORY_SLOTS = [
+        "Top",
+        "Tops",
+        "Bottom",
+        "Bottoms",
+        "Footwear",
+        "Bag",
+        "Bags",
+        "Accessory",
+        "Accessories",
+        "Outerwear",
+        "Dress",
+        "Dresses",
+        "Jumpsuit",
+    ]
 
     def __init__(self, driver: Driver) -> None:
         self._driver = driver
