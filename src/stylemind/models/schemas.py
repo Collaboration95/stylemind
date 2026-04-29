@@ -51,6 +51,7 @@ class PersonaSnapshot(BaseModel):
     disliked_materials: list[str] = Field(default_factory=list)
     budget_tier: str | None = None
     top_occasions: list[str] = Field(default_factory=list)
+    disliked_products: list[str] = Field(default_factory=list)
     confidence_score: float = 0.0
 
 
