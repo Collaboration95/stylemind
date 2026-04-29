@@ -116,13 +116,135 @@ data/
 tests/                 # pytest, asyncio_mode=auto, unit/integration/e2e/performance
 ```
 
+## Environment Variables
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `CHAT_API_KEY` | ✅ | — | API key for the chat LLM provider (Groq by default) |
+| `EXTRACTION_API_KEY` | ✅ | — | API key for the extraction LLM (OpenAI by default) |
+| `NEO4J_PASSWORD` | ✅ | — | Neo4j password (must match `NEO4J_AUTH` in docker-compose) |
+| `CHAT_BASE_URL` | ❌ | `https://api.groq.com/openai/v1` | OpenAI-compatible endpoint for the chat model |
+| `CHAT_MODEL` | ❌ | `llama-3.3-70b-versatile` | Model ID passed to the chat endpoint |
+| `CHAT_TEMPERATURE` | ❌ | `0.7` | Sampling temperature for chat completions |
+| `EXTRACTION_BASE_URL` | ❌ | `https://api.openai.com/v1` | OpenAI-compatible endpoint for extraction |
+| `EXTRACTION_MODEL` | ❌ | `gpt-4.1-nano` | Model ID for persona signal extraction |
+| `NEO4J_URI` | ❌ | `bolt://localhost:7687` | Neo4j bolt URI |
+| `NEO4J_USER` | ❌ | `neo4j` | Neo4j username |
+| `EMBEDDING_PROVIDER` | ❌ | `local` | `local` (sentence-transformers) or `openai` |
+| `EMBEDDING_MODEL` | ❌ | `sentence-transformers/all-MiniLM-L6-v2` | Embedding model name |
+| `EMBEDDING_DIMENSIONS` | ❌ | `384` | Embedding vector dimensions |
+| `CORS_ORIGINS` | ❌ | `*` | Comma-separated allowed CORS origins; restrict in production |
+| `LOG_LEVEL` | ❌ | `INFO` | Python logging level |
+| `VECTOR_TOP_K` | ❌ | `10` | Number of candidates retrieved per query |
+| `PERSONA_DECAY_RATE` | ❌ | `0.15` | Exponential decay rate for persona signal weights per turn |
+| `EXPECTED_SIGNALS_PER_TURN` | ❌ | `3.0` | Denominator for persona confidence calculation |
+| `MIN_SIMILARITY_THRESHOLD` | ❌ | `0.3` | Minimum cosine similarity to include a product |
+| `LANGFUSE_PUBLIC_KEY` | ❌ | — | Leave empty to disable Langfuse tracing |
+| `LANGFUSE_SECRET_KEY` | ❌ | — | Leave empty to disable Langfuse tracing |
+| `LANGFUSE_HOST` | ❌ | `http://localhost:3000` | Langfuse server URL |
+| `SERVER_PORT` | ❌ | `8000` | Port used by the CLI's embedded server |
+
+## Local Development Workflow
+
+```bash
+# 1. Install dependencies
+uv sync --dev
+
+# 2. Start Neo4j only (skip Langfuse if not needed)
+docker-compose up neo4j -d
+
+# 3. Copy and edit env
+cp .env.example .env
+# Set CHAT_API_KEY, EXTRACTION_API_KEY, NEO4J_PASSWORD at minimum
+
+# 4. Seed the graph and embed products
+uv run python scripts/seed.py
+uv run python scripts/embed.py
+
+# 5. Start the API server
+uv run uvicorn stylemind.main:app --reload
+
+# 6. Or launch the CLI (starts server automatically in background)
+uv run python -m stylemind
+```
+
+**Install pre-commit hooks** (runs ruff, pyright, and unit tests on every commit):
+
+```bash
+uv run pre-commit install
+```
+
 ## Running Tests
 
 ```bash
 make test                  # all tests
-pytest -m unit             # unit tests only
-pytest -m integration      # integration tests (requires Neo4j)
+pytest -m unit             # unit tests only (no Neo4j required)
+pytest -m integration      # integration tests (requires Neo4j running)
 pytest -m performance      # benchmarks
+```
+
+## Troubleshooting
+
+**`NEO4J_PASSWORD` not set** — the app raises `ValueError: Required environment variable 'NEO4J_PASSWORD' is not set` on startup. Copy `.env.example` to `.env` and fill in the required values.
+
+**Neo4j not ready** — the CLI polls `/health` for up to 30 s before exiting. If it times out, check `docker-compose logs neo4j` and ensure the password in `.env` matches `NEO4J_AUTH` in `docker-compose.yml`.
+
+**Empty responses / no products retrieved** — check that `scripts/embed.py` ran successfully. Products need embeddings in Neo4j before vector search works. Re-run `uv run python scripts/embed.py`.
+
+**Persona not updating** — persona updates are fire-and-forget after the SSE stream closes. Check logs for `chat persona update failed`. Common causes: Neo4j connectivity blip, or `EXTRACTION_API_KEY` missing/invalid.
+
+**CORS errors in browser** — set `CORS_ORIGINS=https://your-frontend.example.com` in `.env` (comma-separated for multiple origins).
+
+**Langfuse traces not appearing** — verify `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY` are set and the Langfuse server is reachable at `LANGFUSE_HOST`. The app degrades gracefully if Langfuse is unavailable.
+
+## Architecture Sub-Diagrams
+
+### RAG pipeline (per chat turn)
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant API as /chat (SSE)
+    participant R as ProductRetriever
+    participant RR as ProductReranker
+    participant G as StyleMindGenerator
+    participant PM as PersonaManager
+
+    U->>API: POST /chat {message, history}
+    API->>PM: get_persona(user_id)
+    PM-->>API: PersonaSnapshot
+    API->>R: retrieve(message)
+    R-->>API: list[RetrievedProduct]
+    API->>RR: rerank(products, persona)
+    RR-->>API: list[RerankResult]
+    API->>G: stream_response(message, history, products)
+    G-->>U: SSE token stream
+    API-->>U: __JSON__ sources event
+    API-->>U: [DONE]
+    Note over API,PM: fire-and-forget persona update
+    API->>PM: update_persona(user_id, signals)
+```
+
+### Persona inference & storage
+
+```mermaid
+flowchart LR
+    Msg["User message"] --> IE["InferenceEngine\ngpt-4.1-nano"]
+    IE -->|"PersonaSignals\n(aesthetics, materials,\noccasions, budget)"| PM["PersonaManager"]
+    PM -->|"UNWIND batch writes\nin single transaction"| Neo4j[("Neo4j\nStylePersona node\n+ relationship edges")]
+    Neo4j -->|"GET_PERSONA_ALL\n(single query)"| Snap["PersonaSnapshot\n(decay-weighted)"]
+    Snap --> RAG["RAG reranking\n+ outfit building"]
+```
+
+### Outfit builder graph traversal
+
+```mermaid
+flowchart TD
+    Anchor["Anchor product\n(user expressed interest)"] -->|"PAIRS_WITH"| Candidates["Paired candidates"]
+    Candidates --> Filter["Coherence filter\n≥1 season overlap\n≥1 occasion overlap"]
+    Filter --> Rank["Persona ranking\n(aesthetic + occasion match)"]
+    Rank --> Dedup["Deduplicate by category\n(max 1 item per category)"]
+    Dedup --> Outfit["OutfitSuggestion\n(anchor + ≤3 items)"]
 ```
 
 ## Observability

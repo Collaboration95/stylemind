@@ -9,14 +9,23 @@ from stylemind.observability import observe
 
 logger = logging.getLogger(__name__)
 
+# Boost added per matching aesthetic between product and persona (multiplicative with confidence).
+# Capped at _PERSONA_BOOST_CAP so a single highly-matched product can't dominate infinitely.
 _PERSONA_BOOST_PER_AESTHETIC = 0.1
-_PERSONA_BOOST_CAP = 0.3
+_PERSONA_BOOST_CAP = 0.3  # max total boost from aesthetic matching (~3 aesthetic matches)
+
+# Flat boost when a product's budget_tier matches the inferred persona budget tier.
 _BUDGET_BOOST = 0.05
+
+# Penalty applied when a product contains a disliked material or is in the disliked_products list.
+# Applied per violation type (material + product_id can each contribute independently).
 _PERSONA_PENALTY = 0.15
 
 
 @dataclass(frozen=True)
 class ScoreBreakdown:
+    """Per-product score decomposition for explain-mode responses."""
+
     product_id: str
     base_score: float
     persona_boost: float
@@ -37,6 +46,8 @@ class ScoreBreakdown:
 
 @dataclass(frozen=True)
 class RerankResult:
+    """Product with its final persona-adjusted score and optional score breakdown."""
+
     product: RetrievedProduct
     final_score: float
     breakdown: ScoreBreakdown | None = None
