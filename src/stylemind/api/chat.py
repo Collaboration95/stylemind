@@ -4,6 +4,7 @@ import asyncio
 import contextlib
 import json
 import logging
+import time
 from collections.abc import AsyncGenerator
 
 from fastapi import APIRouter, Request
@@ -22,6 +23,7 @@ async def _sse_stream(
     chat_request: ChatRequest,
 ) -> AsyncGenerator[str]:
     """Core SSE generator: retrieve → rerank → (outfit) → stream → fire-and-forget persona update."""
+    turn_start = time.monotonic()
     state = request.app.state
 
     retriever = getattr(state, "retriever", None)
@@ -51,6 +53,21 @@ async def _sse_stream(
             retrieved_products = await asyncio.to_thread(retriever.retrieve, chat_request.message)
         except Exception as exc:
             logger.warning("chat retrieve failed user_id=%s error=%s", chat_request.user_id, exc)
+
+    # 2b. Score retrieval quality in Langfuse
+    if retrieved_products and langfuse_context is not None:
+        scores = [p.similarity_score for p in retrieved_products]
+        mean_sim = sum(scores) / len(scores)
+        max_sim = max(scores)
+        with contextlib.suppress(Exception):
+            langfuse_context.score_current_observation(name="retrieval_mean_similarity", value=mean_sim)
+            langfuse_context.score_current_observation(name="retrieval_max_similarity", value=max_sim)
+        logger.info(
+            "chat retrieval_quality product_count=%d mean_sim=%.3f max_sim=%.3f",
+            len(retrieved_products),
+            mean_sim,
+            max_sim,
+        )
 
     # 3. Rerank with persona signals
     reranked_products = retrieved_products
@@ -119,6 +136,13 @@ async def _sse_stream(
             yield f"data: __JSON__{json.dumps({'explain': explain_payload})}\n\n"
 
     yield "data: [DONE]\n\n"
+
+    # 6b. Score response latency in Langfuse
+    turn_elapsed_ms = (time.monotonic() - turn_start) * 1000
+    if langfuse_context is not None:
+        with contextlib.suppress(Exception):
+            langfuse_context.score_current_observation(name="response_latency_ms", value=turn_elapsed_ms)
+    logger.info("chat response_latency_ms=%.1f user_id=%s", turn_elapsed_ms, chat_request.user_id)
 
     # 7. Persona update — extract signals, persist, and return signals to client for /debug-dev
     if inference_engine is not None and persona_manager is not None:
