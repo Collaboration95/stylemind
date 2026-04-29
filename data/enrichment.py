@@ -1,0 +1,335 @@
+from __future__ import annotations
+
+AESTHETIC_METADATA: dict[str, dict] = {
+    "Old Money": {
+        "name": "Old Money",
+        "description": "Timeless elegance of inherited wealth — heritage fabrics, classic cuts, understated quality that speaks for itself",
+        "keywords": ["classic", "tailored", "heritage", "preppy", "blazer", "loafer", "tweed"],
+    },
+    "Quiet Luxury": {
+        "name": "Quiet Luxury",
+        "description": "Understated sophistication with no visible logos — quality materials and perfect fit as the only signifiers",
+        "keywords": ["minimal", "refined", "quality", "neutral", "clean", "sophisticated", "logo-free"],
+    },
+    "Coastal Grandma": {
+        "name": "Coastal Grandma",
+        "description": "Relaxed seaside elegance — natural linens, easy silhouettes, the effortless ease of a summer by the ocean",
+        "keywords": ["linen", "coastal", "natural", "relaxed", "breezy", "beach", "nautical"],
+    },
+    "Cottagecore": {
+        "name": "Cottagecore",
+        "description": "Romantic rural escapism — floral prints, vintage-inspired silhouettes, the warmth of handmade craftsmanship",
+        "keywords": ["floral", "vintage", "soft", "romantic", "rustic", "prairie", "embroidery"],
+    },
+    "Corporate Minimalism": {
+        "name": "Corporate Minimalism",
+        "description": "Clean professional power dressing — structured silhouettes, monochrome palettes, functional elegance for the modern workplace",
+        "keywords": ["structured", "monochrome", "functional", "professional", "tailored", "sharp", "minimal"],
+    },
+    "Streetwear": {
+        "name": "Streetwear",
+        "description": "Urban youth culture — oversized fits, graphic prints, sneaker culture, the language of the street",
+        "keywords": ["oversized", "graphic", "casual", "urban", "sneaker", "hoodie", "hype"],
+    },
+    "Athleisure": {
+        "name": "Athleisure",
+        "description": "Active-meets-casual lifestyle — performance fabrics adapted for everyday wear, comfort without sacrificing style",
+        "keywords": ["sporty", "comfortable", "performance", "active", "stretch", "gym", "jogger"],
+    },
+    "Y2K": {
+        "name": "Y2K",
+        "description": "Early 2000s nostalgia revival — bold silhouettes, metallic accents, futuristic optimism meets pop culture",
+        "keywords": ["bold", "metallic", "futuristic", "nostalgic", "crop", "low-rise", "shiny"],
+    },
+    "Casual Minimalism": {
+        "name": "Casual Minimalism",
+        "description": "Effortless everyday simplicity — clean lines, neutral tones, the art of looking put-together without trying too hard",
+        "keywords": ["clean", "relaxed", "neutral", "simple", "everyday", "unfussy", "capsule"],
+    },
+}
+
+BRAND_METADATA: dict[str, dict] = {
+    "COS": {"name": "COS", "tier": "Mid", "country_of_origin": "Sweden"},
+    "Arket": {"name": "Arket", "tier": "Mid", "country_of_origin": "Sweden"},
+    "Massimo Dutti": {"name": "Massimo Dutti", "tier": "Premium", "country_of_origin": "Spain"},
+    "New Balance": {"name": "New Balance", "tier": "Mid", "country_of_origin": "USA"},
+    "Mango": {"name": "Mango", "tier": "Budget", "country_of_origin": "Spain"},
+    "Zara": {"name": "Zara", "tier": "Budget", "country_of_origin": "Spain"},
+    "Uniqlo": {"name": "Uniqlo", "tier": "Budget", "country_of_origin": "Japan"},
+    "Toteme": {"name": "Toteme", "tier": "Luxury", "country_of_origin": "Sweden"},
+    "H&M": {"name": "H&M", "tier": "Budget", "country_of_origin": "Sweden"},
+    "Levi's": {"name": "Levi's", "tier": "Mid", "country_of_origin": "USA"},
+    "FabIndia": {"name": "FabIndia", "tier": "Budget", "country_of_origin": "India"},
+    "Auralee": {"name": "Auralee", "tier": "Luxury", "country_of_origin": "Japan"},
+}
+
+SYNTHETIC_PRODUCTS: list[dict] = [
+    # FabIndia products
+    {
+        "product_id": "F001",
+        "name": "Khadi Cotton Kurta",
+        "category": "Tops",
+        "brand": "FabIndia",
+        "price_inr": 2500,
+        "budget_tier": "Mid",
+        "aesthetic": "Casual Minimalism",
+        "occasion": "Casual|Weekend Brunch",
+        "body_type_fit": "All",
+        "color_palette": "Earthy Neutrals",
+        "material": "Khadi Cotton",
+        "season": "Year-round",
+        "description": "Relaxed handwoven khadi cotton kurta with a mandarin collar and side slits, embodying artisanal Indian craft",
+        "pairs_with": "F002|P001|P033",
+    },
+    {
+        "product_id": "F002",
+        "name": "Block Print Palazzo",
+        "category": "Bottoms",
+        "brand": "FabIndia",
+        "price_inr": 3200,
+        "budget_tier": "Mid",
+        "aesthetic": "Coastal Grandma",
+        "occasion": "Casual|Weekend Brunch",
+        "body_type_fit": "Pear|Hourglass",
+        "color_palette": "Earthy Neutrals",
+        "material": "Cotton",
+        "season": "SS|Year-round",
+        "description": "Wide-leg palazzo in block-printed cotton with a drawstring waist, artisan-crafted for effortless warm-weather dressing",
+        "pairs_with": "F001|P018|P031",
+    },
+    {
+        "product_id": "F003",
+        "name": "Embroidered Clutch",
+        "category": "Bags",
+        "brand": "FabIndia",
+        "price_inr": 1800,
+        "budget_tier": "Budget",
+        "aesthetic": "Cottagecore",
+        "occasion": "Casual|Weekend Brunch|Date Night",
+        "body_type_fit": "All",
+        "color_palette": "Warm Nudes",
+        "material": "Cotton",
+        "season": "Year-round",
+        "description": "Hand-embroidered cotton clutch with mirror work detailing, a artisanal accent piece that elevates any outfit",
+        "pairs_with": "F001|F002|P004",
+    },
+    # Auralee products
+    {
+        "product_id": "A001",
+        "name": "Linen Relaxed Shirt",
+        "category": "Tops",
+        "brand": "Auralee",
+        "price_inr": 22000,
+        "budget_tier": "Luxury",
+        "aesthetic": "Quiet Luxury",
+        "occasion": "Office|Casual|Date Night",
+        "body_type_fit": "All",
+        "color_palette": "Soft Whites",
+        "material": "Linen",
+        "season": "SS|Year-round",
+        "description": "Relaxed-fit Japanese linen shirt with a camp collar and clean finish — the platonic ideal of effortless luxury dressing",
+        "pairs_with": "A002|P001|P013|P015",
+    },
+    {
+        "product_id": "A002",
+        "name": "Wool Wide-Leg Trouser",
+        "category": "Bottoms",
+        "brand": "Auralee",
+        "price_inr": 28000,
+        "budget_tier": "Luxury",
+        "aesthetic": "Old Money",
+        "occasion": "Office|Date Night",
+        "body_type_fit": "Rectangle|Hourglass",
+        "color_palette": "Classic Neutrals",
+        "material": "Wool",
+        "season": "AW",
+        "description": "Beautifully draped wide-leg trouser in Japanese wool suiting — impeccable construction with a high waist and fluid silhouette",
+        "pairs_with": "A001|A003|P002|P012",
+    },
+    {
+        "product_id": "A003",
+        "name": "Cashmere Rib Sweater",
+        "category": "Tops",
+        "brand": "Auralee",
+        "price_inr": 35000,
+        "budget_tier": "Luxury",
+        "aesthetic": "Quiet Luxury",
+        "occasion": "Office|Date Night|Casual",
+        "body_type_fit": "All",
+        "color_palette": "Classic Neutrals",
+        "material": "Cashmere",
+        "season": "AW|Year-round",
+        "description": "Fine-gauge cashmere rib-knit sweater with a relaxed fit and refined finish — the ultimate quiet luxury staple",
+        "pairs_with": "A002|P001|P013|P030",
+    },
+]
+
+MATERIAL_METADATA: dict[str, dict] = {
+    "Linen": {"name": "Linen", "parent_material": "Linen", "sustainability_score": 4, "feel_tag": "breathable"},
+    "Wool Blend": {"name": "Wool Blend", "parent_material": "Wool", "sustainability_score": 3, "feel_tag": "warm"},
+    "Cotton Jersey": {
+        "name": "Cotton Jersey",
+        "parent_material": "Cotton",
+        "sustainability_score": 3,
+        "feel_tag": "soft",
+    },
+    "Cotton": {"name": "Cotton", "parent_material": "Cotton", "sustainability_score": 3, "feel_tag": "natural"},
+    "Silk": {"name": "Silk", "parent_material": "Silk", "sustainability_score": 3, "feel_tag": "luxurious"},
+    "Recycled Polyester": {
+        "name": "Recycled Polyester",
+        "parent_material": "Polyester",
+        "sustainability_score": 4,
+        "feel_tag": "technical",
+    },
+    "Leather": {"name": "Leather", "parent_material": "Leather", "sustainability_score": 2, "feel_tag": "structured"},
+    "Full-grain Leather": {
+        "name": "Full-grain Leather",
+        "parent_material": "Leather",
+        "sustainability_score": 2,
+        "feel_tag": "premium",
+    },
+    "Suede": {"name": "Suede", "parent_material": "Leather", "sustainability_score": 2, "feel_tag": "soft"},
+    "Canvas": {"name": "Canvas", "parent_material": "Cotton", "sustainability_score": 3, "feel_tag": "durable"},
+    "Knit": {"name": "Knit", "parent_material": "Mixed", "sustainability_score": 3, "feel_tag": "stretchy"},
+    "Denim": {"name": "Denim", "parent_material": "Cotton", "sustainability_score": 2, "feel_tag": "rugged"},
+    "Mesh": {"name": "Mesh", "parent_material": "Polyester", "sustainability_score": 2, "feel_tag": "technical"},
+    "Velvet": {"name": "Velvet", "parent_material": "Mixed", "sustainability_score": 2, "feel_tag": "luxurious"},
+    "Chiffon": {"name": "Chiffon", "parent_material": "Silk", "sustainability_score": 2, "feel_tag": "delicate"},
+    "Satin": {"name": "Satin", "parent_material": "Silk", "sustainability_score": 3, "feel_tag": "smooth"},
+    "Crepe": {"name": "Crepe", "parent_material": "Mixed", "sustainability_score": 3, "feel_tag": "draped"},
+    "Tweed": {"name": "Tweed", "parent_material": "Wool", "sustainability_score": 4, "feel_tag": "textured"},
+    "Cashmere": {"name": "Cashmere", "parent_material": "Wool", "sustainability_score": 3, "feel_tag": "ultra-soft"},
+    "Wool": {"name": "Wool", "parent_material": "Wool", "sustainability_score": 4, "feel_tag": "warm"},
+    "Fleece": {"name": "Fleece", "parent_material": "Polyester", "sustainability_score": 2, "feel_tag": "cozy"},
+    "Cotton Rib": {
+        "name": "Cotton Rib",
+        "parent_material": "Cotton",
+        "sustainability_score": 3,
+        "feel_tag": "stretchy",
+    },
+    "Cotton Fleece": {
+        "name": "Cotton Fleece",
+        "parent_material": "Cotton",
+        "sustainability_score": 3,
+        "feel_tag": "cozy",
+    },
+    "Cotton Twill": {
+        "name": "Cotton Twill",
+        "parent_material": "Cotton",
+        "sustainability_score": 3,
+        "feel_tag": "structured",
+    },
+    "Cotton Gabardine": {
+        "name": "Cotton Gabardine",
+        "parent_material": "Cotton",
+        "sustainability_score": 3,
+        "feel_tag": "smooth",
+    },
+    "Nylon": {"name": "Nylon", "parent_material": "Nylon", "sustainability_score": 2, "feel_tag": "durable"},
+    "Ripstop Nylon": {
+        "name": "Ripstop Nylon",
+        "parent_material": "Nylon",
+        "sustainability_score": 2,
+        "feel_tag": "technical",
+    },
+    "Polyester": {
+        "name": "Polyester",
+        "parent_material": "Polyester",
+        "sustainability_score": 1,
+        "feel_tag": "synthetic",
+    },
+    "Viscose": {"name": "Viscose", "parent_material": "Viscose", "sustainability_score": 2, "feel_tag": "silky"},
+    "Broderie Anglaise": {
+        "name": "Broderie Anglaise",
+        "parent_material": "Cotton",
+        "sustainability_score": 3,
+        "feel_tag": "delicate",
+    },
+    "Organza": {"name": "Organza", "parent_material": "Silk", "sustainability_score": 2, "feel_tag": "sheer"},
+    "Sequin Knit": {
+        "name": "Sequin Knit",
+        "parent_material": "Mixed",
+        "sustainability_score": 1,
+        "feel_tag": "festive",
+    },
+    "Khadi Cotton": {
+        "name": "Khadi Cotton",
+        "parent_material": "Cotton",
+        "sustainability_score": 5,
+        "feel_tag": "artisanal",
+    },
+    "Wool Crepe": {"name": "Wool Crepe", "parent_material": "Wool", "sustainability_score": 4, "feel_tag": "draped"},
+    "Silk Satin": {"name": "Silk Satin", "parent_material": "Silk", "sustainability_score": 3, "feel_tag": "smooth"},
+    "Silk Blend": {"name": "Silk Blend", "parent_material": "Silk", "sustainability_score": 3, "feel_tag": "luxurious"},
+}
+
+OCCASION_METADATA: dict[str, dict] = {
+    "Casual": {"name": "Casual", "formality_score": 1},
+    "Office": {"name": "Office", "formality_score": 3},
+    "Date Night": {"name": "Date Night", "formality_score": 4},
+    "Weekend Brunch": {"name": "Weekend Brunch", "formality_score": 2},
+    "Active": {"name": "Active", "formality_score": 1},
+    "Formal": {"name": "Formal", "formality_score": 5},
+}
+
+COLOR_PALETTE_METADATA: dict[str, dict] = {
+    "Classic Neutrals": {
+        "name": "Classic Neutrals",
+        "hex_codes": ["#F5F5F0", "#E8E3DA", "#C4B9A8", "#8C8070", "#4A4240", "#1C1A18"],
+    },
+    "Earthy Neutrals": {
+        "name": "Earthy Neutrals",
+        "hex_codes": ["#C4A882", "#B8956A", "#8C6E4A", "#6B4F2E", "#4A3520", "#2E1F0E"],
+    },
+    "Soft Whites": {
+        "name": "Soft Whites",
+        "hex_codes": ["#FEFEFE", "#F9F6F0", "#F0EBE1", "#E8E0D4", "#DDD5C5", "#CEC5B0"],
+    },
+    "Sport Monochromes": {
+        "name": "Sport Monochromes",
+        "hex_codes": ["#FFFFFF", "#D4D4D4", "#A0A0A0", "#606060", "#303030", "#000000"],
+    },
+    "Urban Brights": {
+        "name": "Urban Brights",
+        "hex_codes": ["#FF4444", "#FF8C00", "#FFD700", "#4CAF50", "#2196F3", "#9C27B0"],
+    },
+    "Warm Nudes": {
+        "name": "Warm Nudes",
+        "hex_codes": ["#F5DEB3", "#E8C9A0", "#D4A574", "#C08850", "#A06830", "#7A4A18"],
+    },
+    "Monochromes": {
+        "name": "Monochromes",
+        "hex_codes": ["#FFFFFF", "#F0F0F0", "#808080", "#404040", "#202020", "#000000"],
+    },
+}
+
+BODY_TYPE_METADATA: dict[str, dict] = {
+    "All": {"name": "All", "description": "Universally flattering for all body types"},
+    "Hourglass": {
+        "name": "Hourglass",
+        "description": "Balanced bust and hips with a defined waist — fitted styles that celebrate curves",
+    },
+    "Athletic": {
+        "name": "Athletic",
+        "description": "Broad shoulders with a lean, muscular frame — styles that add softness and movement",
+    },
+    "Rectangle": {
+        "name": "Rectangle",
+        "description": "Similar shoulder and hip width with a less defined waist — styles that create shape and curves",
+    },
+    "Pear": {
+        "name": "Pear",
+        "description": "Hips wider than shoulders — styles that draw attention upward and balance the silhouette",
+    },
+    "Inverted Triangle": {
+        "name": "Inverted Triangle",
+        "description": "Shoulders wider than hips — styles that add volume at the hip and soften broad shoulders",
+    },
+}
+
+BUDGET_TIER_RANGES: dict[str, dict] = {
+    "Budget": {"label": "Budget", "min_inr": 1500, "max_inr": 3500},
+    "Mid": {"label": "Mid", "min_inr": 2200, "max_inr": 9500},
+    "Premium": {"label": "Premium", "min_inr": 4500, "max_inr": 18000},
+    "Luxury": {"label": "Luxury", "min_inr": 18000, "max_inr": 50000},
+}
