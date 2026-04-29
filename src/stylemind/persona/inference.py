@@ -36,6 +36,31 @@ User: "I'm on a tight budget"
 """
 
 
+_PERSONA_JSON_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "liked_aesthetics": {"type": "array", "items": {"type": "string"}},
+        "disliked_materials": {"type": "array", "items": {"type": "string"}},
+        "mentioned_occasions": {"type": "array", "items": {"type": "string"}},
+        "budget_signal": {"type": ["string", "null"]},
+        "color_preferences": {"type": "array", "items": {"type": "string"}},
+        "brand_mentions": {"type": "array", "items": {"type": "string"}},
+        "sentiment_on_shown": {"type": "object", "additionalProperties": {"type": "string"}},
+        "signal_strength": {"type": "number"},
+    },
+    "required": [
+        "liked_aesthetics",
+        "disliked_materials",
+        "mentioned_occasions",
+        "budget_signal",
+        "color_preferences",
+        "brand_mentions",
+        "sentiment_on_shown",
+        "signal_strength",
+    ],
+    "additionalProperties": False,
+}
+
 class PersonaInferenceEngine:
     def __init__(self, config: ExtractionLLMConfig) -> None:
         self._client = OpenAI(base_url=config.base_url, api_key=config.api_key)
@@ -59,7 +84,7 @@ class PersonaInferenceEngine:
             PersonaSignals with extracted signals, or empty PersonaSignals on any failure.
         """
         try:
-            recent_history = history[-6:]  # last 3 turns = 6 messages (user + assistant pairs)
+            recent_history = history[-6:]
 
             context_parts: list[str] = []
             if recent_history:
@@ -78,29 +103,38 @@ class PersonaInferenceEngine:
             else:
                 user_content = message
 
-            response = self._client.chat.completions.create(
-                model=self._model,
-                messages=[
-                    {"role": "system", "content": EXTRACTION_SYSTEM_PROMPT},
-                    {"role": "user", "content": user_content},
-                ],
-                response_format={"type": "json_object"},
-                temperature=0,
-            )
+            try:
+                response = self._client.chat.completions.create(
+                    model=self._model,
+                    messages=[
+                        {"role": "system", "content": EXTRACTION_SYSTEM_PROMPT},
+                        {"role": "user", "content": user_content},
+                    ],
+                    response_format={
+                        "type": "json_schema",
+                        "json_schema": {
+                            "name": "PersonaSignals",
+                            "schema": _PERSONA_JSON_SCHEMA,
+                            "strict": True,
+                        },
+                    },
+                    temperature=0,
+                )
+            except Exception:
+                response = self._client.chat.completions.create(
+                    model=self._model,
+                    messages=[
+                        {"role": "system", "content": EXTRACTION_SYSTEM_PROMPT},
+                        {"role": "user", "content": user_content},
+                    ],
+                    response_format={"type": "json_object"},
+                    temperature=0,
+                )
 
             raw_content = response.choices[0].message.content or "{}"
             data = json.loads(raw_content)
+            signals = PersonaSignals.model_validate(data)
 
-            signals = PersonaSignals(
-                liked_aesthetics=data.get("liked_aesthetics", []),
-                disliked_materials=data.get("disliked_materials", []),
-                mentioned_occasions=data.get("mentioned_occasions", []),
-                budget_signal=data.get("budget_signal"),
-                color_preferences=data.get("color_preferences", []),
-                brand_mentions=data.get("brand_mentions", []),
-                sentiment_on_shown=data.get("sentiment_on_shown", {}),
-                signal_strength=float(data.get("signal_strength", 0.5)),
-            )
             logger.info(
                 "persona signals extracted signal_strength=%.2f liked_aesthetics=%s",
                 signals.signal_strength,

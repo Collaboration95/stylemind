@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import math
-from collections import Counter
 from typing import Any
 
 from neo4j import Driver
@@ -57,8 +56,8 @@ SET r.weight = r.weight + $weight, r.last_seen_turn = $turn
 SET_BUDGET_SIGNAL = """
 MATCH (sp:StylePersona {user_id: $user_id})
 SET sp.budget_signals = CASE
-    WHEN sp.budget_signals IS NULL THEN [$budget_signal]
-    ELSE sp.budget_signals + [$budget_signal]
+    WHEN sp.budget_signals IS NULL THEN [$budget_entry]
+    ELSE sp.budget_signals + [$budget_entry]
 END
 """
 
@@ -140,11 +139,16 @@ class PersonaManager:
             if name:
                 disliked_materials.append(name)
 
-        # Budget tier: weighted mode (most frequent budget signal)
-        budget_tier: str | None = None
-        if budget_signals:
-            counter = Counter(budget_signals)
-            budget_tier = counter.most_common(1)[0][0]
+        budget_weights: dict[str, float] = {}
+        for entry in budget_signals:
+            if isinstance(entry, dict):
+                sig = entry.get("signal", "")
+                w = float(entry.get("weight", 1.0))
+            else:
+                sig = str(entry)
+                w = 1.0
+            budget_weights[sig] = budget_weights.get(sig, 0.0) + w
+        budget_tier: str | None = max(budget_weights, key=lambda k: budget_weights[k]) if budget_weights else None
 
         confidence = self._confidence_score(decayed_weights, turn_count)
 
@@ -238,7 +242,7 @@ class PersonaManager:
                 try:
                     self._driver.execute_query(
                         SET_BUDGET_SIGNAL,
-                        {"user_id": user_id, "budget_signal": signals.budget_signal},
+                        {"user_id": user_id, "budget_entry": {"signal": signals.budget_signal, "weight": signals.signal_strength}},
                         database_="neo4j",
                     )
                 except Exception as exc:
