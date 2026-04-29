@@ -24,6 +24,16 @@ class ScoreBreakdown:
     budget_boost: float
     final_score: float
 
+    def to_dict(self) -> dict[str, float | str]:
+        return {
+            "product_id": self.product_id,
+            "base_score": self.base_score,
+            "persona_boost": self.persona_boost,
+            "penalty": self.persona_penalty,
+            "budget_boost": self.budget_boost,
+            "final_score": self.final_score,
+        }
+
 
 @dataclass(frozen=True)
 class RerankResult:
