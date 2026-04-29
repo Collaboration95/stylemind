@@ -81,7 +81,8 @@ async def _sse_stream(
         except Exception as exc:
             logger.warning("chat detect_product_interest failed user_id=%s error=%s", chat_request.user_id, exc)
 
-    # 5. Stream LLM response
+    # 5. Stream LLM response (with persona context for personalized tone)
+    persona_dict = persona.model_dump() if persona.confidence_score > 0.0 else None
     if generator is not None:
         try:
             async for chunk in generator.stream_response(
@@ -89,6 +90,7 @@ async def _sse_stream(
                 history=chat_request.history,
                 retrieved_products=reranked_products,
                 outfit=outfit,
+                persona=persona_dict,
             ):
                 yield f"data: {chunk}\n\n"
         except Exception as exc:
