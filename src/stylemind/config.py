@@ -115,19 +115,16 @@ class AppSettings:
     min_similarity_threshold: float
 
     def __post_init__(self) -> None:
-        assert self.log_level in ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"), (
-            f"Invalid log_level: {self.log_level}"
-        )
-        assert self.vector_top_k > 0, f"vector_top_k must be > 0, got {self.vector_top_k}"
-        assert 0.0 < self.persona_decay_rate < 1.0, (
-            f"persona_decay_rate must be in (0, 1), got {self.persona_decay_rate}"
-        )
-        assert self.expected_signals_per_turn > 0.0, (
-            f"expected_signals_per_turn must be > 0, got {self.expected_signals_per_turn}"
-        )
-        assert 0.0 <= self.min_similarity_threshold <= 1.0, (
-            f"min_similarity_threshold must be in [0, 1], got {self.min_similarity_threshold}"
-        )
+        if self.log_level not in ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"):
+            raise ValueError(f"Invalid log_level: {self.log_level!r}")
+        if self.vector_top_k <= 0:
+            raise ValueError(f"vector_top_k must be > 0, got {self.vector_top_k}")
+        if not (0.0 < self.persona_decay_rate < 1.0):
+            raise ValueError(f"persona_decay_rate must be in (0, 1), got {self.persona_decay_rate}")
+        if self.expected_signals_per_turn <= 0.0:
+            raise ValueError(f"expected_signals_per_turn must be > 0, got {self.expected_signals_per_turn}")
+        if not (0.0 <= self.min_similarity_threshold <= 1.0):
+            raise ValueError(f"min_similarity_threshold must be in [0, 1], got {self.min_similarity_threshold}")
 
     @classmethod
     def from_env(cls) -> AppSettings:
