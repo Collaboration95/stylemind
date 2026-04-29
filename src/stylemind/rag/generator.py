@@ -121,7 +121,10 @@ class StyleMindGenerator:
         )
 
         async for chunk in stream:
-            delta = chunk.choices[0].delta.content if chunk.choices else None
+            if not chunk.choices:
+                logger.debug("generator received chunk with empty choices array model=%s", self._config.model)
+                continue
+            delta = chunk.choices[0].delta.content
             if delta:
                 yield delta
 
