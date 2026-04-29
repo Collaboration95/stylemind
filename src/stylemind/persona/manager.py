@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import logging
 import math
+import time
+from collections.abc import Callable
 from typing import Any
 
 from neo4j import Driver
@@ -11,8 +13,11 @@ from stylemind.models.schemas import PersonaSnapshot
 
 logger = logging.getLogger(__name__)
 
+_RETRY_ATTEMPTS = 3
+_RETRY_BASE_DELAY = 0.25  # seconds
+
 # ---------------------------------------------------------------------------
-# Cypher queries for persona management
+# Cypher queries
 # ---------------------------------------------------------------------------
 
 MERGE_STYLE_PERSONA = """
@@ -22,34 +27,48 @@ SET sp.turn_count = sp.turn_count + 1
 RETURN sp.turn_count AS turn_count
 """
 
-MERGE_PREFERS_AESTHETIC = """
+# Batched UNWIND write queries — one round trip per relationship type
+BATCH_MERGE_AESTHETICS = """
+UNWIND $items AS item
 MATCH (sp:StylePersona {user_id: $user_id})
-MATCH (a:Aesthetic {name: $aesthetic_name})
+MATCH (a:Aesthetic {name: item.name})
 MERGE (sp)-[r:PREFERS]->(a)
 ON CREATE SET r.weight = 0, r.last_seen_turn = $turn
 SET r.weight = r.weight + $weight, r.last_seen_turn = $turn
 """
 
-MERGE_DISLIKES_MATERIAL = """
+BATCH_MERGE_MATERIALS = """
+UNWIND $items AS item
 MATCH (sp:StylePersona {user_id: $user_id})
-MATCH (m:Material {name: $material_name})
+MATCH (m:Material {name: item.name})
 MERGE (sp)-[r:DISLIKES]->(m)
 ON CREATE SET r.weight = 0, r.last_seen_turn = $turn
 SET r.weight = r.weight + $weight, r.last_seen_turn = $turn
 """
 
-MERGE_DISLIKES_PRODUCT = """
+BATCH_MERGE_DISLIKED_PRODUCTS = """
+UNWIND $items AS item
 MATCH (sp:StylePersona {user_id: $user_id})
-MATCH (p:Product {product_id: $product_id})
+MATCH (p:Product {product_id: item.name})
 MERGE (sp)-[r:DISLIKES]->(p)
 ON CREATE SET r.weight = 0, r.last_seen_turn = $turn
 SET r.weight = r.weight + $weight, r.last_seen_turn = $turn
 """
 
-MERGE_SHOPS_AT_BRAND = """
+BATCH_MERGE_BRANDS = """
+UNWIND $items AS item
 MATCH (sp:StylePersona {user_id: $user_id})
-MATCH (b:Brand {name: $brand_name})
+MATCH (b:Brand {name: item.name})
 MERGE (sp)-[r:SHOPS_AT]->(b)
+ON CREATE SET r.weight = 0, r.last_seen_turn = $turn
+SET r.weight = r.weight + $weight, r.last_seen_turn = $turn
+"""
+
+BATCH_MERGE_OCCASIONS = """
+UNWIND $items AS item
+MATCH (sp:StylePersona {user_id: $user_id})
+MATCH (o:Occasion {name: item.name})
+MERGE (sp)-[r:INTERESTED_IN]->(o)
 ON CREATE SET r.weight = 0, r.last_seen_turn = $turn
 SET r.weight = r.weight + $weight, r.last_seen_turn = $turn
 """
@@ -62,38 +81,51 @@ SET sp.budget_signals = CASE
 END
 """
 
-GET_PERSONA_DATA = """
+# Single batched read — replaces the three-query N+1 pattern.
+# Uses WITH to collect each relationship type before the next OPTIONAL MATCH,
+# preventing row explosion from cartesian products.
+GET_PERSONA_ALL = """
 MATCH (sp:StylePersona {user_id: $user_id})
 OPTIONAL MATCH (sp)-[rp:PREFERS]->(a:Aesthetic)
 OPTIONAL MATCH (sp)-[rd:DISLIKES]->(dm:Material)
+WITH sp,
+     collect(DISTINCT {aesthetic: a.name, weight: rp.weight, last_seen: rp.last_seen_turn}) AS preferences,
+     collect(DISTINCT {material: dm.name, weight: rd.weight, last_seen: rd.last_seen_turn}) AS dislikes
+OPTIONAL MATCH (sp)-[ro:INTERESTED_IN]->(o:Occasion)
+WITH sp, preferences, dislikes,
+     collect(DISTINCT {occasion: o.name, weight: ro.weight, last_seen: ro.last_seen_turn}) AS occasions
+OPTIONAL MATCH (sp)-[rdp:DISLIKES]->(p:Product)
 RETURN sp.turn_count AS turn_count,
        sp.budget_signals AS budget_signals,
-       collect(DISTINCT {aesthetic: a.name, weight: rp.weight, last_seen: rp.last_seen_turn}) AS preferences,
-       collect(DISTINCT {material: dm.name, weight: rd.weight, last_seen: rd.last_seen_turn}) AS dislikes
+       preferences,
+       dislikes,
+       occasions,
+       collect(DISTINCT p.product_id) AS disliked_product_ids
 """
 
-GET_OCCASIONS_DATA = """
-MATCH (sp:StylePersona {user_id: $user_id})
-OPTIONAL MATCH (sp)-[ro:INTERESTED_IN]->(o:Occasion)
-RETURN collect(DISTINCT {occasion: o.name, weight: ro.weight, last_seen: ro.last_seen_turn}) AS occasions
-"""
 
-MERGE_INTERESTED_IN_OCCASION = """
-MATCH (sp:StylePersona {user_id: $user_id})
-MATCH (o:Occasion {name: $occasion_name})
-MERGE (sp)-[r:INTERESTED_IN]->(o)
-ON CREATE SET r.weight = 0, r.last_seen_turn = $turn
-SET r.weight = r.weight + $weight, r.last_seen_turn = $turn
-"""
-
-GET_DISLIKED_PRODUCTS = """
-MATCH (sp:StylePersona {user_id: $user_id})
-OPTIONAL MATCH (sp)-[rd:DISLIKES]->(p:Product)
-RETURN collect(DISTINCT p.product_id) AS disliked_product_ids
-"""
+def _retry[T](
+    fn: Callable[[], T],
+    attempts: int = _RETRY_ATTEMPTS,
+    base_delay: float = _RETRY_BASE_DELAY,
+) -> T:
+    """Call fn() with exponential backoff on transient exceptions."""
+    last_exc: Exception | None = None
+    for attempt in range(attempts):
+        try:
+            return fn()
+        except Exception as exc:
+            last_exc = exc
+            if attempt < attempts - 1:
+                delay = base_delay * (2**attempt)
+                logger.warning("retry attempt=%d/%d error=%s sleeping=%.2fs", attempt + 1, attempts, exc, delay)
+                time.sleep(delay)
+    raise last_exc  # type: ignore[misc]
 
 
 class PersonaManager:
+    """Manages per-user style persona state in Neo4j."""
+
     def __init__(self, driver: Driver, decay_rate: float = 0.15, expected_signals_per_turn: float = 3.0) -> None:
         self._driver = driver
         self._decay_rate = decay_rate
@@ -102,10 +134,8 @@ class PersonaManager:
     def get_persona(self, user_id: str) -> PersonaSnapshot:
         """Return persona snapshot. Returns empty default on first turn, NEVER None."""
         try:
-            result = self._driver.execute_query(
-                GET_PERSONA_DATA,
-                {"user_id": user_id},
-                database_="neo4j",
+            result = _retry(
+                lambda: self._driver.execute_query(GET_PERSONA_ALL, {"user_id": user_id}, database_="neo4j")
             )
             records = [record.data() for record in result.records]
         except Exception as exc:
@@ -121,11 +151,12 @@ class PersonaManager:
         budget_signals: list[str] = row.get("budget_signals") or []
         preferences: list[dict[str, Any]] = row.get("preferences") or []
         dislikes: list[dict[str, Any]] = row.get("dislikes") or []
+        occasions_raw: list[dict[str, Any]] = row.get("occasions") or []
+        disliked_products: list[str] = row.get("disliked_product_ids") or []
 
-        # Apply temporal decay to aesthetics
+        # Temporal decay on aesthetics
         decayed_aesthetics: list[tuple[str, float]] = []
         decayed_weights: list[float] = []
-
         for pref in preferences:
             name = pref.get("aesthetic")
             weight = pref.get("weight")
@@ -135,55 +166,24 @@ class PersonaManager:
             effective = self._apply_decay(float(weight), int(last_seen), turn_count)
             decayed_aesthetics.append((name, effective))
             decayed_weights.append(effective)
-
         decayed_aesthetics.sort(key=lambda x: x[1], reverse=True)
         preferred_aesthetics = [name for name, _ in decayed_aesthetics[:5]]
 
-        # Disliked materials (no decay — dislikes are persistent)
-        disliked_materials: list[str] = []
-        for dis in dislikes:
-            name = dis.get("material")
-            if name:
-                disliked_materials.append(name)
+        # Disliked materials (persistent, no decay)
+        disliked_materials: list[str] = [d["material"] for d in dislikes if d.get("material")]
 
-        # Fetch occasions with temporal decay (top 3 by decayed weight)
-        top_occasions: list[str] = []
-        try:
-            occ_result = self._driver.execute_query(
-                GET_OCCASIONS_DATA,
-                {"user_id": user_id},
-                database_="neo4j",
-            )
-            occ_records = [record.data() for record in occ_result.records]
-            if occ_records:
-                occasions_raw: list[dict[str, Any]] = occ_records[0].get("occasions") or []
-                decayed_occasions: list[tuple[str, float]] = []
-                for occ in occasions_raw:
-                    occ_name = occ.get("occasion")
-                    occ_weight = occ.get("weight")
-                    occ_last_seen = occ.get("last_seen")
-                    if occ_name is None or occ_weight is None or occ_last_seen is None:
-                        continue
-                    effective = self._apply_decay(float(occ_weight), int(occ_last_seen), turn_count)
-                    decayed_occasions.append((occ_name, effective))
-                decayed_occasions.sort(key=lambda x: x[1], reverse=True)
-                top_occasions = [name for name, _ in decayed_occasions[:3]]
-        except Exception as exc:
-            logger.warning("persona get_occasions query failed user_id=%s error=%s", user_id, exc)
-
-        # Fetch disliked products (no decay — dislikes are persistent)
-        disliked_products: list[str] = []
-        try:
-            dp_result = self._driver.execute_query(
-                GET_DISLIKED_PRODUCTS,
-                {"user_id": user_id},
-                database_="neo4j",
-            )
-            dp_records = [record.data() for record in dp_result.records]
-            if dp_records:
-                disliked_products = dp_records[0].get("disliked_product_ids") or []
-        except Exception as exc:
-            logger.warning("persona get_disliked_products query failed user_id=%s error=%s", user_id, exc)
+        # Temporal decay on occasions
+        decayed_occasions: list[tuple[str, float]] = []
+        for occ in occasions_raw:
+            occ_name = occ.get("occasion")
+            occ_weight = occ.get("weight")
+            occ_last_seen = occ.get("last_seen")
+            if occ_name is None or occ_weight is None or occ_last_seen is None:
+                continue
+            effective = self._apply_decay(float(occ_weight), int(occ_last_seen), turn_count)
+            decayed_occasions.append((occ_name, effective))
+        decayed_occasions.sort(key=lambda x: x[1], reverse=True)
+        top_occasions = [name for name, _ in decayed_occasions[:3]]
 
         # Budget tier: weighted accumulation
         budget_weights: dict[str, float] = {}
@@ -216,88 +216,90 @@ class PersonaManager:
         )
 
     def update_persona(self, user_id: str, signals: PersonaSignals) -> None:
-        """Merge persona signals into Neo4j graph."""
+        """Merge persona signals into Neo4j inside a single transaction."""
         try:
-            # Increment turn_count and get current turn
-            result = self._driver.execute_query(
-                MERGE_STYLE_PERSONA,
-                {"user_id": user_id},
-                database_="neo4j",
-            )
-            records = [record.data() for record in result.records]
-            turn_count: int = records[0].get("turn_count", 1) if records else 1
+            with self._driver.session(database="neo4j") as session, session.begin_transaction() as tx:
+                # Increment turn_count and get current turn
+                result = tx.run(MERGE_STYLE_PERSONA, {"user_id": user_id})
+                records = list(result)
+                turn_count: int = records[0].data().get("turn_count", 1) if records else 1
 
-            weight = signals.signal_strength
+                weight = signals.signal_strength
 
-            # PREFERS -> Aesthetic
-            for aesthetic in signals.liked_aesthetics:
-                try:
-                    self._driver.execute_query(
-                        MERGE_PREFERS_AESTHETIC,
-                        {"user_id": user_id, "aesthetic_name": aesthetic, "weight": weight, "turn": turn_count},
-                        database_="neo4j",
+                # Batched PREFERS -> Aesthetic
+                if signals.liked_aesthetics:
+                    tx.run(
+                        BATCH_MERGE_AESTHETICS,
+                        {
+                            "user_id": user_id,
+                            "items": [{"name": a} for a in signals.liked_aesthetics],
+                            "weight": weight,
+                            "turn": turn_count,
+                        },
                     )
-                except Exception as exc:
-                    logger.warning("persona merge aesthetic failed aesthetic=%s error=%s", aesthetic, exc)
 
-            # DISLIKES -> Material
-            for material in signals.disliked_materials:
-                try:
-                    self._driver.execute_query(
-                        MERGE_DISLIKES_MATERIAL,
-                        {"user_id": user_id, "material_name": material, "weight": weight, "turn": turn_count},
-                        database_="neo4j",
+                # Batched DISLIKES -> Material
+                if signals.disliked_materials:
+                    tx.run(
+                        BATCH_MERGE_MATERIALS,
+                        {
+                            "user_id": user_id,
+                            "items": [{"name": m} for m in signals.disliked_materials],
+                            "weight": weight,
+                            "turn": turn_count,
+                        },
                     )
-                except Exception as exc:
-                    logger.warning("persona merge material failed material=%s error=%s", material, exc)
 
-            # DISLIKES -> Product (for negative sentiment)
-            for product_id, sentiment in signals.sentiment_on_shown.items():
-                if sentiment == "negative":
-                    try:
-                        self._driver.execute_query(
-                            MERGE_DISLIKES_PRODUCT,
-                            {"user_id": user_id, "product_id": product_id, "weight": weight, "turn": turn_count},
-                            database_="neo4j",
-                        )
-                    except Exception as exc:
-                        logger.warning("persona merge dislike product failed product_id=%s error=%s", product_id, exc)
-
-            # SHOPS_AT -> Brand
-            for brand in signals.brand_mentions:
-                try:
-                    self._driver.execute_query(
-                        MERGE_SHOPS_AT_BRAND,
-                        {"user_id": user_id, "brand_name": brand, "weight": weight, "turn": turn_count},
-                        database_="neo4j",
+                # Batched DISLIKES -> Product (negative sentiment only)
+                negative_product_ids = [
+                    pid for pid, sentiment in signals.sentiment_on_shown.items() if sentiment == "negative"
+                ]
+                if negative_product_ids:
+                    tx.run(
+                        BATCH_MERGE_DISLIKED_PRODUCTS,
+                        {
+                            "user_id": user_id,
+                            "items": [{"name": pid} for pid in negative_product_ids],
+                            "weight": weight,
+                            "turn": turn_count,
+                        },
                     )
-                except Exception as exc:
-                    logger.warning("persona merge brand failed brand=%s error=%s", brand, exc)
 
-            # INTERESTED_IN -> Occasion
-            for occasion in signals.mentioned_occasions:
-                try:
-                    self._driver.execute_query(
-                        MERGE_INTERESTED_IN_OCCASION,
-                        {"user_id": user_id, "occasion_name": occasion, "weight": weight, "turn": turn_count},
-                        database_="neo4j",
+                # Batched SHOPS_AT -> Brand
+                if signals.brand_mentions:
+                    tx.run(
+                        BATCH_MERGE_BRANDS,
+                        {
+                            "user_id": user_id,
+                            "items": [{"name": b} for b in signals.brand_mentions],
+                            "weight": weight,
+                            "turn": turn_count,
+                        },
                     )
-                except Exception as exc:
-                    logger.warning("persona merge occasion failed occasion=%s error=%s", occasion, exc)
 
-            # Budget signal: append to list on StylePersona node
-            if signals.budget_signal:
-                try:
-                    self._driver.execute_query(
+                # Batched INTERESTED_IN -> Occasion
+                if signals.mentioned_occasions:
+                    tx.run(
+                        BATCH_MERGE_OCCASIONS,
+                        {
+                            "user_id": user_id,
+                            "items": [{"name": o} for o in signals.mentioned_occasions],
+                            "weight": weight,
+                            "turn": turn_count,
+                        },
+                    )
+
+                # Budget signal
+                if signals.budget_signal:
+                    tx.run(
                         SET_BUDGET_SIGNAL,
                         {
                             "user_id": user_id,
                             "budget_entry": {"signal": signals.budget_signal, "weight": signals.signal_strength},
                         },
-                        database_="neo4j",
                     )
-                except Exception as exc:
-                    logger.warning("persona set budget_signal failed budget=%s error=%s", signals.budget_signal, exc)
+
+                tx.commit()
 
             logger.info(
                 "persona updated user_id=%s turn=%d aesthetics=%d materials=%d",
@@ -311,10 +313,7 @@ class PersonaManager:
             logger.warning("persona update_persona failed user_id=%s error=%s", user_id, exc)
 
     def _apply_decay(self, weight: float, last_seen_turn: int, current_turn: int) -> float:
-        """Compute effective weight with exponential temporal decay.
-
-        effective_weight = raw_weight * exp(-decay_rate * (current_turn - last_seen_turn))
-        """
+        """Compute effective weight with exponential temporal decay."""
         delta = max(0, current_turn - last_seen_turn)
         return weight * math.exp(-self._decay_rate * delta)
 
