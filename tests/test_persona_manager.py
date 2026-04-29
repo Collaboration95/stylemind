@@ -135,13 +135,17 @@ def test_confidence_grows_with_signals() -> None:
 
 @pytest.mark.unit
 def test_budget_accumulation() -> None:
-    """Multiple turns with same budget_signal → budget_tier set correctly via mode."""
-    # Simulate get_persona receiving a record with 3 'premium' and 1 'luxury' signals
+    """Multiple turns with same budget_signal -> budget_tier set correctly via weighted mode."""
     driver = _make_driver_with_records(
         [
             {
                 "turn_count": 4,
-                "budget_signals": ["premium", "premium", "luxury", "premium"],
+                "budget_signals": [
+                    {"signal": "premium", "weight": 0.8},
+                    {"signal": "premium", "weight": 0.6},
+                    {"signal": "luxury", "weight": 0.9},
+                    {"signal": "premium", "weight": 0.7},
+                ],
                 "preferences": [],
                 "dislikes": [],
             }
@@ -151,8 +155,33 @@ def test_budget_accumulation() -> None:
 
     snapshot = manager.get_persona("user_budget")
 
-    # Most common = "premium" (3 out of 4)
     assert snapshot.budget_tier == "premium", f"Expected 'premium', got {snapshot.budget_tier!r}"
+
+
+@pytest.mark.unit
+def test_weighted_budget_outranks_count() -> None:
+    """Weighted accumulation: a high-weight single signal beats multiple low-weight ones."""
+    driver = _make_driver_with_records(
+        [
+            {
+                "turn_count": 3,
+                "budget_signals": [
+                    {"signal": "budget", "weight": 0.3},
+                    {"signal": "budget", "weight": 0.3},
+                    {"signal": "luxury", "weight": 0.9},
+                ],
+                "preferences": [],
+                "dislikes": [],
+            }
+        ]
+    )
+    manager = _make_manager(driver)
+
+    snapshot = manager.get_persona("user_weighted")
+
+    assert snapshot.budget_tier == "luxury", (
+        f"Expected 'luxury' (weighted 0.9 > 0.6), got {snapshot.budget_tier!r}"
+    )
 
 
 @pytest.mark.unit

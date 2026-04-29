@@ -101,3 +101,23 @@ def test_pipe_separated_materials_produce_multiple_entries() -> None:
         materials = [m.strip() for m in p["material"].split("|")]
         for mat in materials:
             assert mat in MATERIAL_METADATA, f"Material {mat!r} not in MATERIAL_METADATA (product {p['product_id']})"
+
+
+@pytest.mark.unit
+def test_pipe_separated_color_palettes_valid() -> None:
+    """Products with pipe-separated color_palette should have all palettes in COLOR_PALETTE_METADATA."""
+    from seed import parse_csv  # type: ignore[import]
+
+    from data.enrichment import COLOR_PALETTE_METADATA
+
+    csv_path = Path("data/products_seed.csv")
+    products = parse_csv(csv_path)
+    pipe_products = [p for p in products if "|" in p["color_palette"]]
+    assert len(pipe_products) > 0, "Expected at least one product with pipe-separated color palettes"
+    for p in pipe_products:
+        palettes = [cp.strip() for cp in p["color_palette"].split("|")]
+        assert len(palettes) >= 2, f"Expected >= 2 palettes for {p['product_id']}, got {palettes}"
+        for cp in palettes:
+            assert cp in COLOR_PALETTE_METADATA, (
+                f"Color palette {cp!r} not in COLOR_PALETTE_METADATA (product {p['product_id']})"
+            )
