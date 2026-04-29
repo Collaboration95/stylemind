@@ -6,7 +6,9 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from stylemind.models.domain import RetrievedProduct
 from stylemind.models.schemas import PersonaSnapshot
+from stylemind.rag.reranker import RerankResult, ScoreBreakdown
 
 # ---------------------------------------------------------------------------
 # Helpers / fixtures
@@ -215,3 +217,172 @@ def test_persona_endpoint_returns_default_when_no_data():
     assert data["preferred_aesthetics"] == []
     assert data["confidence_score"] == 0.0
     assert data["budget_tier"] is None
+
+
+# ---------------------------------------------------------------------------
+# SSE __JSON__ events
+# ---------------------------------------------------------------------------
+
+
+def _make_products():
+    return [
+        RetrievedProduct(
+            product_id="P001",
+            name="Linen Trouser",
+            description="test",
+            price=4200,
+            category="Bottoms",
+            brand="COS",
+            budget_tier="Mid",
+            aesthetics=["Quiet Luxury"],
+            occasions=["Office"],
+            colors=["Neutrals"],
+            seasons=["SS"],
+            pairs_with=[],
+            similarity_score=0.85,
+        ),
+        RetrievedProduct(
+            product_id="P005",
+            name="Ribbed Polo",
+            description="test",
+            price=1800,
+            category="Tops",
+            brand="Uniqlo",
+            budget_tier="Budget",
+            aesthetics=["Streetwear"],
+            occasions=["Casual"],
+            colors=["Neutrals"],
+            seasons=["Year-round"],
+            pairs_with=[],
+            similarity_score=0.78,
+        ),
+    ]
+
+
+def _make_rerank_results(products, explain=False):
+    results = []
+    for p in products:
+        breakdown = None
+        if explain:
+            breakdown = ScoreBreakdown(
+                product_id=p.product_id,
+                base_score=p.similarity_score,
+                persona_boost=0.04,
+                persona_penalty=0.0,
+                budget_boost=0.0,
+                final_score=p.similarity_score + 0.04,
+            )
+        results.append(
+            RerankResult(product=p, final_score=p.similarity_score + (0.04 if explain else 0.0), breakdown=breakdown)
+        )
+    return results
+
+
+def _parse_sse_data(response):
+    payloads = []
+    for line in response.text.splitlines():
+        if line.startswith("data: "):
+            payloads.append(line[6:])
+    return payloads
+
+
+@pytest.mark.integration
+def test_chat_emits_sources_json_event():
+    products = _make_products()
+    rerank_results = _make_rerank_results(products, explain=False)
+
+    app = _make_app_with_mocks(stream_chunks=["Hello"])
+
+    mock_retriever = app.state.retriever
+    mock_retriever.retrieve = MagicMock(return_value=products)
+
+    mock_reranker = app.state.reranker
+    mock_reranker.rerank = MagicMock(return_value=rerank_results)
+
+    client = TestClient(app, raise_server_exceptions=True)
+    response = client.post("/chat", json={"user_id": "u1", "message": "test"})
+
+    assert response.status_code == 200
+    payloads = _parse_sse_data(response)
+
+    sources_events = [p for p in payloads if p.startswith("__JSON__") and '"sources"' in p]
+    assert len(sources_events) == 1
+
+    import json
+
+    data = json.loads(sources_events[0][8:])
+    assert len(data["sources"]) == 2
+    assert data["sources"][0]["product_id"] == "P001"
+    assert data["sources"][0]["name"] == "Linen Trouser"
+    assert data["sources"][0]["brand"] == "COS"
+    assert data["sources"][0]["price_inr"] == 4200
+
+
+@pytest.mark.integration
+def test_chat_emits_explain_json_event_when_explain_true():
+    products = _make_products()
+    rerank_results = _make_rerank_results(products, explain=True)
+
+    app = _make_app_with_mocks(stream_chunks=["Hello"])
+
+    mock_retriever = app.state.retriever
+    mock_retriever.retrieve = MagicMock(return_value=products)
+
+    mock_reranker = app.state.reranker
+    mock_reranker.rerank = MagicMock(return_value=rerank_results)
+
+    client = TestClient(app, raise_server_exceptions=True)
+    response = client.post("/chat", json={"user_id": "u1", "message": "test", "explain": True})
+
+    assert response.status_code == 200
+    payloads = _parse_sse_data(response)
+
+    import json
+
+    explain_events = [p for p in payloads if p.startswith("__JSON__") and '"explain"' in p]
+    assert len(explain_events) == 1
+
+    data = json.loads(explain_events[0][8:])
+    assert len(data["explain"]) == 2
+    assert data["explain"][0]["product_id"] == "P001"
+    assert data["explain"][0]["base_score"] == pytest.approx(0.85)
+    assert data["explain"][0]["persona_boost"] == pytest.approx(0.04)
+    assert data["explain"][0]["penalty"] == pytest.approx(0.0)
+    assert data["explain"][0]["final_score"] == pytest.approx(0.89)
+
+
+@pytest.mark.integration
+def test_chat_no_explain_event_when_explain_false():
+    products = _make_products()
+    rerank_results = _make_rerank_results(products, explain=False)
+
+    app = _make_app_with_mocks(stream_chunks=["Hello"])
+
+    mock_retriever = app.state.retriever
+    mock_retriever.retrieve = MagicMock(return_value=products)
+
+    mock_reranker = app.state.reranker
+    mock_reranker.rerank = MagicMock(return_value=rerank_results)
+
+    client = TestClient(app, raise_server_exceptions=True)
+    response = client.post("/chat", json={"user_id": "u1", "message": "test", "explain": False})
+
+    assert response.status_code == 200
+    payloads = _parse_sse_data(response)
+
+    explain_events = [p for p in payloads if p.startswith("__JSON__") and '"explain"' in p]
+    assert len(explain_events) == 0
+
+
+@pytest.mark.unit
+def test_score_breakdown_to_dict():
+    sb = ScoreBreakdown(
+        product_id="P001", base_score=0.85, persona_boost=0.04, persona_penalty=0.0, budget_boost=0.02, final_score=0.91
+    )
+    d = sb.to_dict()
+    assert d["product_id"] == "P001"
+    assert d["base_score"] == pytest.approx(0.85)
+    assert d["persona_boost"] == pytest.approx(0.04)
+    assert d["penalty"] == pytest.approx(0.0)
+    assert d["budget_boost"] == pytest.approx(0.02)
+    assert d["final_score"] == pytest.approx(0.91)

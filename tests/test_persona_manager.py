@@ -135,13 +135,17 @@ def test_confidence_grows_with_signals() -> None:
 
 @pytest.mark.unit
 def test_budget_accumulation() -> None:
-    """Multiple turns with same budget_signal → budget_tier set correctly via mode."""
-    # Simulate get_persona receiving a record with 3 'premium' and 1 'luxury' signals
+    """Multiple turns with same budget_signal -> budget_tier set correctly via weighted mode."""
     driver = _make_driver_with_records(
         [
             {
                 "turn_count": 4,
-                "budget_signals": ["premium", "premium", "luxury", "premium"],
+                "budget_signals": [
+                    {"signal": "premium", "weight": 0.8},
+                    {"signal": "premium", "weight": 0.6},
+                    {"signal": "luxury", "weight": 0.9},
+                    {"signal": "premium", "weight": 0.7},
+                ],
                 "preferences": [],
                 "dislikes": [],
             }
@@ -151,8 +155,31 @@ def test_budget_accumulation() -> None:
 
     snapshot = manager.get_persona("user_budget")
 
-    # Most common = "premium" (3 out of 4)
     assert snapshot.budget_tier == "premium", f"Expected 'premium', got {snapshot.budget_tier!r}"
+
+
+@pytest.mark.unit
+def test_weighted_budget_outranks_count() -> None:
+    """Weighted accumulation: a high-weight single signal beats multiple low-weight ones."""
+    driver = _make_driver_with_records(
+        [
+            {
+                "turn_count": 3,
+                "budget_signals": [
+                    {"signal": "budget", "weight": 0.3},
+                    {"signal": "budget", "weight": 0.3},
+                    {"signal": "luxury", "weight": 0.9},
+                ],
+                "preferences": [],
+                "dislikes": [],
+            }
+        ]
+    )
+    manager = _make_manager(driver)
+
+    snapshot = manager.get_persona("user_weighted")
+
+    assert snapshot.budget_tier == "luxury", f"Expected 'luxury' (weighted 0.9 > 0.6), got {snapshot.budget_tier!r}"
 
 
 @pytest.mark.unit
@@ -261,3 +288,175 @@ def test_first_write_weight_not_doubled() -> None:
     assert "ON CREATE SET r.weight = 0" in query, (
         "MERGE query should initialize weight to 0 on CREATE to prevent doubling"
     )
+
+
+@pytest.mark.unit
+def test_top_occasions_populated_with_decay() -> None:
+    """After turns with occasion signals, top_occasions is populated with decayed weights, top 3."""
+    driver = MagicMock()
+
+    persona_result = MagicMock()
+    persona_rec = MagicMock()
+    persona_rec.data.return_value = {
+        "turn_count": 3,
+        "budget_signals": None,
+        "preferences": [],
+        "dislikes": [],
+    }
+    persona_result.records = [persona_rec]
+
+    occasion_result = MagicMock()
+    occasion_rec = MagicMock()
+    occasion_rec.data.return_value = {
+        "occasions": [
+            {"occasion": "Date Night", "weight": 2.0, "last_seen": 3},
+            {"occasion": "Office", "weight": 1.5, "last_seen": 2},
+            {"occasion": "Casual", "weight": 0.5, "last_seen": 1},
+        ]
+    }
+    occasion_result.records = [occasion_rec]
+
+    disliked_result = MagicMock()
+    disliked_rec = MagicMock()
+    disliked_rec.data.return_value = {"disliked_product_ids": []}
+    disliked_result.records = [disliked_rec]
+
+    driver.execute_query.side_effect = [persona_result, occasion_result, disliked_result]
+
+    manager = _make_manager(driver)
+    snapshot = manager.get_persona("user_occasions")
+
+    assert len(snapshot.top_occasions) == 3
+    assert snapshot.top_occasions[0] == "Date Night"
+    assert snapshot.top_occasions[1] == "Office"
+    assert snapshot.top_occasions[2] == "Casual"
+
+
+@pytest.mark.unit
+def test_top_occasions_limited_to_three() -> None:
+    """top_occasions returns at most 3 entries even if more occasions exist."""
+    driver = MagicMock()
+
+    persona_result = MagicMock()
+    persona_rec = MagicMock()
+    persona_rec.data.return_value = {"turn_count": 5, "budget_signals": None, "preferences": [], "dislikes": []}
+    persona_result.records = [persona_rec]
+
+    occasion_result = MagicMock()
+    occasion_rec = MagicMock()
+    occasion_rec.data.return_value = {
+        "occasions": [
+            {"occasion": "Date Night", "weight": 4.0, "last_seen": 5},
+            {"occasion": "Office", "weight": 3.0, "last_seen": 5},
+            {"occasion": "Casual", "weight": 2.0, "last_seen": 5},
+            {"occasion": "Brunch", "weight": 1.0, "last_seen": 5},
+            {"occasion": "Wedding Guest", "weight": 0.5, "last_seen": 5},
+        ]
+    }
+    occasion_result.records = [occasion_rec]
+
+    disliked_result = MagicMock()
+    disliked_rec = MagicMock()
+    disliked_rec.data.return_value = {"disliked_product_ids": []}
+    disliked_result.records = [disliked_rec]
+
+    driver.execute_query.side_effect = [persona_result, occasion_result, disliked_result]
+
+    manager = _make_manager(driver)
+    snapshot = manager.get_persona("user_many_occasions")
+
+    assert len(snapshot.top_occasions) == 3
+    assert snapshot.top_occasions == ["Date Night", "Office", "Casual"]
+
+
+@pytest.mark.unit
+def test_disliked_products_populated() -> None:
+    """Negative sentiment on products populates disliked_products in snapshot."""
+    driver = MagicMock()
+
+    persona_result = MagicMock()
+    persona_rec = MagicMock()
+    persona_rec.data.return_value = {"turn_count": 2, "budget_signals": None, "preferences": [], "dislikes": []}
+    persona_result.records = [persona_rec]
+
+    occasion_result = MagicMock()
+    occasion_rec = MagicMock()
+    occasion_rec.data.return_value = {"occasions": []}
+    occasion_result.records = [occasion_rec]
+
+    disliked_result = MagicMock()
+    disliked_rec = MagicMock()
+    disliked_rec.data.return_value = {"disliked_product_ids": ["P012", "P045"]}
+    disliked_result.records = [disliked_rec]
+
+    driver.execute_query.side_effect = [persona_result, occasion_result, disliked_result]
+
+    manager = _make_manager(driver)
+    snapshot = manager.get_persona("user_dislike")
+
+    assert "P012" in snapshot.disliked_products
+    assert "P045" in snapshot.disliked_products
+
+
+@pytest.mark.unit
+def test_occasion_decay_ordering() -> None:
+    """Occasion with older last_seen decays below a newer but lighter occasion."""
+    driver = MagicMock()
+
+    persona_result = MagicMock()
+    persona_rec = MagicMock()
+    persona_rec.data.return_value = {"turn_count": 10, "budget_signals": None, "preferences": [], "dislikes": []}
+    persona_result.records = [persona_rec]
+
+    occasion_result = MagicMock()
+    occasion_rec = MagicMock()
+    occasion_rec.data.return_value = {
+        "occasions": [
+            {"occasion": "Office", "weight": 3.0, "last_seen": 1},
+            {"occasion": "Date Night", "weight": 1.0, "last_seen": 10},
+        ]
+    }
+    occasion_result.records = [occasion_rec]
+
+    disliked_result = MagicMock()
+    disliked_rec = MagicMock()
+    disliked_rec.data.return_value = {"disliked_product_ids": []}
+    disliked_result.records = [disliked_rec]
+
+    driver.execute_query.side_effect = [persona_result, occasion_result, disliked_result]
+
+    manager = _make_manager(driver)
+    snapshot = manager.get_persona("user_decay_order")
+
+    # Office: 3.0 * exp(-0.15 * 9) ≈ 3.0 * 0.2592 ≈ 0.778
+    # Date Night: 1.0 * exp(-0.15 * 0) = 1.0
+    # Date Night should rank higher despite lower raw weight
+    assert snapshot.top_occasions[0] == "Date Night"
+
+
+@pytest.mark.unit
+def test_disliked_products_empty_when_none() -> None:
+    """disliked_products defaults to empty list when query returns no data."""
+    driver = MagicMock()
+
+    persona_result = MagicMock()
+    persona_rec = MagicMock()
+    persona_rec.data.return_value = {"turn_count": 1, "budget_signals": None, "preferences": [], "dislikes": []}
+    persona_result.records = [persona_rec]
+
+    occasion_result = MagicMock()
+    occasion_rec = MagicMock()
+    occasion_rec.data.return_value = {"occasions": []}
+    occasion_result.records = [occasion_rec]
+
+    disliked_result = MagicMock()
+    disliked_rec = MagicMock()
+    disliked_rec.data.return_value = {"disliked_product_ids": None}
+    disliked_result.records = [disliked_rec]
+
+    driver.execute_query.side_effect = [persona_result, occasion_result, disliked_result]
+
+    manager = _make_manager(driver)
+    snapshot = manager.get_persona("user_no_dislikes")
+
+    assert snapshot.disliked_products == []
