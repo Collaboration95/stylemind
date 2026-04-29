@@ -9,14 +9,14 @@ Loom recording target: under 5 minutes. Each turn approximately 30 seconds of na
 ### 1. Environment Variables
 
 ```bash
-export GROQ_API_KEY="<your-groq-key>"
-export OPENAI_API_KEY="<your-openai-key>"
-export NEO4J_URI="bolt://localhost:7687"
-export NEO4J_USER="neo4j"
-export NEO4J_PASSWORD="<your-neo4j-password>"
+cp .env.example .env
+# Edit .env — set these required keys:
+#   CHAT_API_KEY=<your-groq-key>
+#   EXTRACTION_API_KEY=<your-extraction-llm-key>
+#   NEO4J_PASSWORD=stylemind_secret
+
 # Verify keys are set without exposing values:
-echo "GROQ_API_KEY is set: $([ -n "$GROQ_API_KEY" ] && echo yes || echo NO)"
-echo "OPENAI_API_KEY is set: $([ -n "$OPENAI_API_KEY" ] && echo yes || echo NO)"
+grep -c "API_KEY=" .env && echo "Keys configured"
 ```
 
 ### 2. Start Infrastructure

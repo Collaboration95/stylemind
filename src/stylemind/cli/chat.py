@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from collections.abc import Generator
 from dataclasses import dataclass, field
 from typing import Any
@@ -15,11 +16,14 @@ from rich.table import Table
 logger = logging.getLogger(__name__)
 
 _WELCOME = """
-[bold cyan]StyleMind Fashion Assistant[/bold cyan]
-User ID: [bold]{user_id}[/bold]
+[bold cyan]StyleMind[/bold cyan] — Your Personal Fashion Stylist
 
-Type [green]/help[/green] to see available commands.
-Type your fashion question to get started!
+Hi! I'm StyleMind. I learn your style as we chat — no questionnaires,
+just natural conversation. Tell me what you're looking for and I'll
+find pieces that match your vibe.
+
+[dim]Session:[/dim] [bold]{user_id}[/bold]
+[dim]Type[/dim] [green]/help[/green] [dim]if you're not sure what to do.[/dim]
 """
 
 _HELP_TEXT = """
@@ -30,7 +34,28 @@ _HELP_TEXT = """
   [green]/debug-dev[/green]   Show all persona signals extracted this session (dev tool)
   [green]/clear[/green]       Clear conversation history and start fresh
   [green]/exit[/green]        Exit the chat (also: /quit, quit, exit)
+
+[dim]Conversation starters:[/dim]
+  "I need something for a date night"
+  "Show me minimal summer outfits under 5k"
+  "I love the quiet luxury aesthetic"
 """
+
+_CONFIDENCE_LABELS = [
+    (0.0, "[dim]learning...[/dim]"),
+    (0.2, "[yellow]getting to know you[/yellow]"),
+    (0.4, "[green]building your profile[/green]"),
+    (0.6, "[green]personalized[/green]"),
+    (0.8, "[bold green]dialed in[/bold green]"),
+]
+
+
+def _confidence_label(score: float) -> str:
+    label = _CONFIDENCE_LABELS[0][1]
+    for threshold, text in _CONFIDENCE_LABELS:
+        if score >= threshold:
+            label = text
+    return label
 
 
 @dataclass
@@ -54,6 +79,7 @@ class ChatCLI:
         self._history: list[dict[str, str]] = []
         self._turn_count = 0
         self._signal_log: list[TurnSignals] = []
+        self._last_confidence: float = 0.0
 
     # ------------------------------------------------------------------
     # Public entry point
@@ -63,9 +89,10 @@ class ChatCLI:
         self.console.print(_WELCOME.format(user_id=self.user_id))
         while True:
             try:
-                user_input = prompt("You: ").strip()
+                prompt_text = f"You (turn {self._turn_count + 1}): " if self._turn_count > 0 else "You: "
+                user_input = prompt(prompt_text).strip()
             except EOFError, KeyboardInterrupt:
-                self.console.print("\n[dim]Goodbye![/dim]")
+                self._exit_with_summary()
                 break
 
             if not user_input:
@@ -74,7 +101,7 @@ class ChatCLI:
             cmd = user_input.lower()
 
             if cmd in {"quit", "exit", "/quit", "/exit"}:
-                self.console.print("[dim]Goodbye![/dim]")
+                self._exit_with_summary()
                 break
 
             if cmd == "/help":
@@ -93,7 +120,8 @@ class ChatCLI:
                 self._history.clear()
                 self._turn_count = 0
                 self._signal_log.clear()
-                self.console.print("[dim]Conversation history cleared.[/dim]")
+                self._last_confidence = 0.0
+                self.console.print("[dim]Conversation history cleared. Fresh start![/dim]")
                 continue
 
             self._send_message(user_input)
@@ -115,6 +143,7 @@ class ChatCLI:
         self.console.print("[bold green]StyleMind:[/bold green]", end=" ")
 
         full_text = ""
+        start = time.monotonic()
         try:
             with (
                 httpx.Client(timeout=60.0) as client,
@@ -134,10 +163,25 @@ class ChatCLI:
             self.console.print(f"[red]Connection error: {exc}[/red]")
             return
 
+        elapsed = time.monotonic() - start
         self.console.print()
+
+        # Confidence indicator after each response
+        self._update_confidence()
+        conf_label = _confidence_label(self._last_confidence)
+        self.console.print(f"[dim]  {elapsed:.1f}s | persona: {conf_label}[/dim]")
 
         self._history.append({"role": "user", "content": message})
         self._history.append({"role": "assistant", "content": full_text})
+
+    def _update_confidence(self) -> None:
+        try:
+            with httpx.Client(timeout=5.0) as client:
+                resp = client.get(f"{self.base_url}/persona/{self.user_id}")
+                if resp.status_code == 200:
+                    self._last_confidence = resp.json().get("confidence_score", 0.0)
+        except Exception:
+            pass
 
     def _parse_sse_stream(self, response: httpx.Response) -> Generator[str]:
         for line in response.iter_lines():
@@ -277,18 +321,22 @@ class ChatCLI:
             self.console.print(f"[red]Connection error: {exc}[/red]")
             return
 
+        self._render_persona_panel(data)
+
+    def _render_persona_panel(self, data: dict[str, Any]) -> None:
         aesthetics = ", ".join(data.get("preferred_aesthetics", [])) or "[dim]none yet[/dim]"
         disliked = ", ".join(data.get("disliked_materials", [])) or "[dim]none[/dim]"
         budget = data.get("budget_tier") or "[dim]unknown[/dim]"
         occasions = ", ".join(data.get("top_occasions", [])) or "[dim]none yet[/dim]"
         confidence = data.get("confidence_score", 0.0)
+        conf_label = _confidence_label(confidence)
 
         lines = [
             f"[green]Aesthetics:[/green]       {aesthetics}",
             f"[red]Disliked materials:[/red] {disliked}",
             f"[yellow]Budget tier:[/yellow]      {budget}",
             f"[blue]Occasions:[/blue]        {occasions}",
-            f"[magenta]Confidence:[/magenta]       {confidence:.2f}",
+            f"[magenta]Confidence:[/magenta]       {confidence:.2f} ({conf_label})",
         ]
 
         panel = Panel(
@@ -333,3 +381,23 @@ class ChatCLI:
             table.add_row(str(ts.turn), aesthetics, materials, budget, occasions, colors, brands, strength)
 
         self.console.print(table)
+
+    # ------------------------------------------------------------------
+    # Exit with session summary
+    # ------------------------------------------------------------------
+
+    def _exit_with_summary(self) -> None:
+        if self._turn_count > 0 and self._signal_log:
+            self.console.print()
+            self.console.print("[bold cyan]Session Summary[/bold cyan]")
+            self.console.print(f"[dim]Turns: {self._turn_count} | Signals extracted: {len(self._signal_log)}[/dim]")
+
+            try:
+                with httpx.Client(timeout=5.0) as client:
+                    resp = client.get(f"{self.base_url}/persona/{self.user_id}")
+                    if resp.status_code == 200:
+                        self._render_persona_panel(resp.json())
+            except Exception:
+                pass
+
+        self.console.print("[dim]Goodbye! Your style persona is saved for next time.[/dim]")
