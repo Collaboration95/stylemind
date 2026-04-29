@@ -4,40 +4,12 @@ import logging
 from typing import Any
 
 from stylemind.graph.client import Neo4jClient
+from stylemind.graph.queries import VECTOR_SEARCH_PRODUCTS
 from stylemind.models.domain import RetrievedProduct
 from stylemind.observability import observe
 from stylemind.rag.embedder import Embedder
 
 logger = logging.getLogger(__name__)
-
-VECTOR_SEARCH_PRODUCTS = """
-CALL db.index.vector.queryNodes('product_embeddings', $top_k, $embedding)
-YIELD node AS p, score
-WITH p, score
-WHERE score >= $min_threshold
-MATCH (p)-[:BELONGS_TO]->(b:Brand)
-OPTIONAL MATCH (p)-[:EMBODIES]->(a:Aesthetic)
-OPTIONAL MATCH (p)-[:FITS_OCCASION]->(o:Occasion)
-OPTIONAL MATCH (p)-[:IN_COLOR]->(cp:ColorPalette)
-OPTIONAL MATCH (p)-[:BEST_IN_SEASON]->(s:Season)
-OPTIONAL MATCH (p)-[:AT_TIER]->(bt:BudgetTier)
-OPTIONAL MATCH (p)-[:PAIRS_WITH]-(partner:Product)
-WITH p, b, bt, score,
-     collect(DISTINCT a.name) AS aesthetics,
-     collect(DISTINCT o.name) AS occasions,
-     collect(DISTINCT cp.name) AS colors,
-     collect(DISTINCT s.name) AS seasons,
-     collect(DISTINCT partner.product_id) AS pairs_with
-RETURN p.product_id AS product_id,
-       p.name AS name,
-       p.description AS description,
-       p.price_inr AS price,
-       p.category AS category,
-       b.name AS brand,
-       coalesce(bt.label, p.budget_tier) AS budget_tier,
-       aesthetics, occasions, colors, seasons, pairs_with, score
-ORDER BY score DESC
-"""
 
 
 def _row_to_retrieved_product(row: dict[str, Any]) -> RetrievedProduct:
