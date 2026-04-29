@@ -5,6 +5,8 @@ from dataclasses import dataclass, field
 
 @dataclass(frozen=True)
 class ProductRecord:
+    """Raw product row from the seed CSV, before graph insertion."""
+
     product_id: str
     name: str
     category: str
@@ -24,6 +26,8 @@ class ProductRecord:
 
 @dataclass(frozen=True)
 class RetrievedProduct:
+    """Product returned by vector search with expanded graph relationships."""
+
     product_id: str
     name: str
     description: str

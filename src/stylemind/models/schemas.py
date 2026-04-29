@@ -4,6 +4,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class ChatRequest(BaseModel):
+    """Incoming chat request with user message and optional history."""
+
     model_config = ConfigDict(extra="forbid")
 
     user_id: str = Field(max_length=128, pattern=r"^[a-zA-Z0-9_-]+$")
@@ -13,6 +15,8 @@ class ChatRequest(BaseModel):
 
 
 class ProductSummary(BaseModel):
+    """Compact product representation for API responses."""
+
     product_id: str
     name: str
     brand: str
@@ -33,6 +37,8 @@ class OutfitItemSchema(BaseModel):
 
 
 class OutfitSuggestion(BaseModel):
+    """Complete outfit suggestion with anchor and paired items."""
+
     anchor: ProductSummary
     items: list[OutfitItemSchema]
     occasion: str

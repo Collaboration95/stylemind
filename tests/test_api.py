@@ -386,3 +386,30 @@ def test_score_breakdown_to_dict():
     assert d["penalty"] == pytest.approx(0.0)
     assert d["budget_boost"] == pytest.approx(0.02)
     assert d["final_score"] == pytest.approx(0.91)
+
+
+@pytest.mark.unit
+def test_health_returns_503_when_embedder_down():
+    """GET /health returns 503 when embedder is not loaded."""
+    app = _make_app_with_mocks(neo4j_ok=True, embedder_ok=False)
+    client = TestClient(app, raise_server_exceptions=True)
+
+    response = client.get("/health")
+
+    assert response.status_code == 503
+    data = response.json()
+    assert data["embedder"] is False
+
+
+@pytest.mark.unit
+def test_chat_when_generator_is_none():
+    """POST /chat when generator is None returns graceful error message."""
+    app = _make_app_with_mocks(stream_chunks=["Hello"])
+
+    app.state.generator = None
+
+    client = TestClient(app, raise_server_exceptions=True)
+    response = client.post("/chat", json={"user_id": "u1", "message": "hello"})
+
+    assert response.status_code == 200
+    assert "not available" in response.text.lower() or "StyleMind generator not available" in response.text

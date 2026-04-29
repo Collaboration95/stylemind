@@ -21,6 +21,8 @@ def get_optional_variable(name: str, default: str) -> str:
 
 @dataclass(frozen=True)
 class Neo4jConfig:
+    """Neo4j database connection settings."""
+
     uri: str
     user: str
     password: str
@@ -36,6 +38,8 @@ class Neo4jConfig:
 
 @dataclass(frozen=True)
 class ChatLLMConfig:
+    """Chat LLM provider settings (Groq, OpenAI-compatible)."""
+
     base_url: str
     api_key: str
     model: str
@@ -53,6 +57,8 @@ class ChatLLMConfig:
 
 @dataclass(frozen=True)
 class ExtractionLLMConfig:
+    """Extraction LLM provider settings for structured persona signal extraction."""
+
     base_url: str
     api_key: str
     model: str
@@ -68,6 +74,8 @@ class ExtractionLLMConfig:
 
 @dataclass(frozen=True)
 class EmbeddingConfig:
+    """Embedding model settings (local sentence-transformers or OpenAI)."""
+
     provider: Literal["local", "openai"]
     model_name: str
     dimensions: int
@@ -98,6 +106,8 @@ class LangfuseConfig:
 
 @dataclass(frozen=True)
 class AppSettings:
+    """Application-level tuning parameters with range validation."""
+
     log_level: str
     vector_top_k: int
     persona_decay_rate: float
@@ -124,6 +134,8 @@ class AppSettings:
 
 @dataclass(frozen=True)
 class AppConfig:
+    """Root application configuration aggregating all sub-configs."""
+
     neo4j: Neo4jConfig
     chat_llm: ChatLLMConfig
     extraction_llm: ExtractionLLMConfig
