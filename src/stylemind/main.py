@@ -13,6 +13,7 @@ from stylemind.api import chat as chat_router
 from stylemind.api import health as health_router
 from stylemind.api import persona as persona_router
 from stylemind.config import get_config
+from stylemind.observability import init_langfuse
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     logging.basicConfig(level=config.settings.log_level)
 
     # --- Startup ---
+
+    # 0. Langfuse observability (graceful degradation if not configured)
+    lf_client = init_langfuse(config.langfuse)
+    app.state.langfuse = lf_client
+    if lf_client is not None:
+        logger.info("lifespan langfuse_enabled=true host=%s", config.langfuse.host)
+    else:
+        logger.info("lifespan langfuse_enabled=false")
 
     # 1. Neo4j client
     from stylemind.graph.client import Neo4jClient
