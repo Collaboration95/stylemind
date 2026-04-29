@@ -217,10 +217,11 @@ def seed(driver) -> None:  # type: ignore[type-arg]
                 if bt in BODY_TYPE_METADATA:
                     session.run(Q.REL_PRODUCT_SUITS_BODY, {"product_id": pid, "body_type_name": bt})
 
-            # MADE_FROM Material
-            mat = p["material"].strip()
-            if mat in MATERIAL_METADATA:
-                session.run(Q.REL_PRODUCT_MADE_FROM, {"product_id": pid, "material_name": mat})
+            # MADE_FROM Material — pipe-separated
+            for mat in p["material"].split("|"):
+                mat = mat.strip()
+                if mat and mat in MATERIAL_METADATA:
+                    session.run(Q.REL_PRODUCT_MADE_FROM, {"product_id": pid, "material_name": mat})
 
             # BEST_IN_SEASON — pipe-separated
             for season in p["season"].split("|"):

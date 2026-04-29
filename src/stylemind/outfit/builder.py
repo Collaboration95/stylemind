@@ -31,7 +31,7 @@ MATCH (anchor:Product {product_id: $product_id})
 OPTIONAL MATCH (anchor)-[:FITS_OCCASION]->(ao:Occasion)
 OPTIONAL MATCH (anchor)-[:BEST_IN_SEASON]->(as:Season)
 WITH anchor, collect(DISTINCT ao.name) AS anchor_occasions, collect(DISTINCT as.name) AS anchor_seasons
-MATCH (anchor)-[:PAIRS_WITH|<-[:PAIRS_WITH]]-(paired:Product)
+MATCH (anchor)-[:PAIRS_WITH]-(paired:Product)
 OPTIONAL MATCH (paired)-[:FITS_OCCASION]->(po:Occasion)
 OPTIONAL MATCH (paired)-[:BEST_IN_SEASON]->(ps:Season)
 OPTIONAL MATCH (paired)-[:BELONGS_TO]->(pb:Brand)
