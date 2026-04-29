@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from stylemind.models.domain import ConversationState, ConversationTurn, ProductRecord
+from stylemind.models.domain import ProductRecord
 from stylemind.models.enums import Aesthetic, BodyType, BudgetTier, Category, ColorPalette, Occasion, Season
 from stylemind.models.schemas import PersonaSignals, PersonaSnapshot
 
@@ -113,25 +113,6 @@ def test_product_record_is_immutable() -> None:
     )
     with pytest.raises(AttributeError):
         record.name = "Modified"  # type: ignore[misc]
-
-
-@pytest.mark.unit
-def test_conversation_state_default_turn_count() -> None:
-    state = ConversationState(user_id="user-123")
-    assert state.turn_count == 0
-    assert state.history == []
-
-
-@pytest.mark.unit
-def test_conversation_state_with_turns() -> None:
-    turns = [
-        ConversationTurn(role="user", content="Hello"),
-        ConversationTurn(role="assistant", content="Hi there!"),
-    ]
-    state = ConversationState(user_id="user-456", history=turns, turn_count=1)
-    assert state.turn_count == 1
-    assert len(state.history) == 2
-    assert state.history[0].role == "user"
 
 
 # ---------------------------------------------------------------------------

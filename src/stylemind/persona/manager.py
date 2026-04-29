@@ -309,10 +309,6 @@ class PersonaManager:
         except Exception as exc:
             logger.warning("persona update_persona failed user_id=%s error=%s", user_id, exc)
 
-    def get_persona_snapshot(self, user_id: str) -> PersonaSnapshot:
-        """Alias for get_persona - matches spec R5 JSON shape exactly."""
-        return self.get_persona(user_id)
-
     def _apply_decay(self, weight: float, last_seen_turn: int, current_turn: int) -> float:
         """Compute effective weight with exponential temporal decay.
 

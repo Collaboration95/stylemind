@@ -37,13 +37,6 @@ class OutfitSuggestion(BaseModel):
     season: str
 
 
-class ChatResponse(BaseModel):
-    user_id: str
-    response: str
-    sources: list[ProductSummary] = Field(default_factory=list)
-    outfit: OutfitSuggestion | None = None
-
-
 class PersonaSnapshot(BaseModel):
     """Matches spec R5 exactly."""
 
