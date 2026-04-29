@@ -40,8 +40,10 @@ That's it. The app is available at `http://localhost:8000`. Neo4j Browser at `ht
 
 | Method | Endpoint | Description | Request | Response |
 |--------|----------|-------------|---------|----------|
-| `POST` | `/chat` | Streaming chat with persona-aware RAG | `ChatRequest { user_id, message, history, explain }` | SSE stream of tokens + optional explain block |
+| `POST` | `/chat` | Streaming chat with persona-aware RAG | `ChatRequest { user_id, message, history, explain }` | SSE stream of tokens + structured JSON events |
 | `GET` | `/persona/{user_id}` | Current inferred persona snapshot | — | `PersonaSnapshot` JSON |
+| `GET` | `/outfit/{product_id}` | Build a coherent outfit around an anchor product | `?user_id=` (optional) | `OutfitSuggestion` JSON |
+| `GET` | `/products/names` | List all product names with IDs (for autocomplete) | — | `list[{product_id, name, brand}]` |
 | `GET` | `/health` | Liveness check (Neo4j + embedder) | — | `200 OK` or `503` |
 
 ## CLI Usage
@@ -54,11 +56,15 @@ Within the chat session:
 
 | Command | Action |
 |---------|--------|
-| `/help` | Show all available commands |
+| `/help` | Show all available commands and conversation starters |
 | `/persona` | Print the current inferred persona snapshot |
+| `/outfit <name>` | Build a complete outfit around a product (fuzzy name matching + tab-complete) |
 | `/debug-dev` | Show per-turn persona signals extracted this session (developer tool) |
 | `/clear` | Clear conversation history and start fresh |
 | `/exit` or `/quit` | End the session (also: `quit`, `exit`) |
+| `1` / `2` / `3` | Use a conversation starter (shown on welcome screen) |
+
+Product names support **tab-completion** — start typing and press Tab.
 
 ## Design Decisions
 
