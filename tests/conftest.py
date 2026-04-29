@@ -61,7 +61,7 @@ def sample_retrieved_products():
             product_id="P001",
             name="Linen Wide-Leg Trouser",
             description="Relaxed wide-leg trouser in breathable linen with a high waist and tailored pleat",
-            price=4200,
+            price_inr=4200,
             category="Bottoms",
             brand="COS",
             budget_tier="Mid",
@@ -76,7 +76,7 @@ def sample_retrieved_products():
             product_id="P005",
             name="Ribbed Polo Shirt",
             description="Fine ribbed polo in Pima cotton with a subtle tipped collar",
-            price=1800,
+            price_inr=1800,
             category="Tops",
             brand="Uniqlo",
             budget_tier="Budget",
@@ -91,7 +91,7 @@ def sample_retrieved_products():
             product_id="P012",
             name="Silk Slip Cami",
             description="Bias-cut slip cami in washed silk with adjustable spaghetti straps and a deep V",
-            price=3800,
+            price_inr=3800,
             category="Tops",
             brand="COS",
             budget_tier="Mid",
@@ -106,7 +106,7 @@ def sample_retrieved_products():
             product_id="P019",
             name="Tailored Blazer (Fitted)",
             description="Double-breasted fitted blazer in pressed wool crepe — structured and minimal",
-            price=22000,
+            price_inr=22000,
             category="Outerwear",
             brand="Toteme",
             budget_tier="Luxury",
@@ -121,7 +121,7 @@ def sample_retrieved_products():
             product_id="P027",
             name="Pleated Midi Skirt",
             description="Knife-pleated midi skirt in fluid silk blend — movement with restraint",
-            price=4800,
+            price_inr=4800,
             category="Bottoms",
             brand="COS",
             budget_tier="Mid",
@@ -152,7 +152,7 @@ def sample_persona_snapshot():
 @pytest.fixture
 def sample_persona_signals():
     """Returns PersonaSignals with liked_aesthetics=['Quiet Luxury'], signal_strength=0.7."""
-    from stylemind.models.schemas import PersonaSignals
+    from stylemind.models.domain import PersonaSignals
 
     return PersonaSignals(
         liked_aesthetics=["Quiet Luxury"],

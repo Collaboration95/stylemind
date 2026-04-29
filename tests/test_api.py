@@ -58,7 +58,7 @@ def _make_app_with_mocks(
 
     # --- PersonaInferenceEngine mock ---
     mock_inference = MagicMock()
-    from stylemind.models.schemas import PersonaSignals
+    from stylemind.models.domain import PersonaSignals
 
     mock_inference.extract_signals = MagicMock(return_value=PersonaSignals())
     test_app.state.inference_engine = mock_inference
@@ -230,7 +230,7 @@ def _make_products():
             product_id="P001",
             name="Linen Trouser",
             description="test",
-            price=4200,
+            price_inr=4200,
             category="Bottoms",
             brand="COS",
             budget_tier="Mid",
@@ -245,7 +245,7 @@ def _make_products():
             product_id="P005",
             name="Ribbed Polo",
             description="test",
-            price=1800,
+            price_inr=1800,
             category="Tops",
             brand="Uniqlo",
             budget_tier="Budget",

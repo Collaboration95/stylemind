@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ChatRequest(BaseModel):
-    user_id: str
-    message: str
+    model_config = ConfigDict(extra="forbid")
+
+    user_id: str = Field(max_length=128, pattern=r"^[a-zA-Z0-9_-]+$")
+    message: str = Field(max_length=2000, min_length=1)
     history: list[dict[str, str]] = Field(default_factory=list)
     explain: bool = False
 
@@ -40,21 +42,11 @@ class OutfitSuggestion(BaseModel):
 class PersonaSnapshot(BaseModel):
     """Matches spec R5 exactly."""
 
+    model_config = ConfigDict(extra="ignore")
+
     preferred_aesthetics: list[str] = Field(default_factory=list)
     disliked_materials: list[str] = Field(default_factory=list)
     disliked_products: list[str] = Field(default_factory=list)
     budget_tier: str | None = None
     top_occasions: list[str] = Field(default_factory=list)
-    disliked_products: list[str] = Field(default_factory=list)
-    confidence_score: float = 0.0
-
-
-class PersonaSignals(BaseModel):
-    liked_aesthetics: list[str] = Field(default_factory=list)
-    disliked_materials: list[str] = Field(default_factory=list)
-    mentioned_occasions: list[str] = Field(default_factory=list)
-    budget_signal: str | None = None  # "budget", "mid", "premium", "luxury"
-    color_preferences: list[str] = Field(default_factory=list)
-    brand_mentions: list[str] = Field(default_factory=list)
-    sentiment_on_shown: dict[str, str] = Field(default_factory=dict)  # product_id -> "positive"/"negative"
-    signal_strength: float = 0.5
+    confidence_score: float = Field(default=0.0, ge=0.0, le=1.0)

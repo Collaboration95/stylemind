@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import threading
 from dataclasses import dataclass
+from typing import Literal
 
 
 def get_required_variable(name: str) -> str:
@@ -67,7 +68,7 @@ class ExtractionLLMConfig:
 
 @dataclass(frozen=True)
 class EmbeddingConfig:
-    provider: str  # "local" or "openai"
+    provider: Literal["local", "openai"]
     model_name: str
     dimensions: int
 
@@ -102,6 +103,13 @@ class AppSettings:
     persona_decay_rate: float
     expected_signals_per_turn: float
     min_similarity_threshold: float
+
+    def __post_init__(self) -> None:
+        assert self.log_level in ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"), f"Invalid log_level: {self.log_level}"
+        assert self.vector_top_k > 0, f"vector_top_k must be > 0, got {self.vector_top_k}"
+        assert 0.0 < self.persona_decay_rate < 1.0, f"persona_decay_rate must be in (0, 1), got {self.persona_decay_rate}"
+        assert self.expected_signals_per_turn > 0.0, f"expected_signals_per_turn must be > 0, got {self.expected_signals_per_turn}"
+        assert 0.0 <= self.min_similarity_threshold <= 1.0, f"min_similarity_threshold must be in [0, 1], got {self.min_similarity_threshold}"
 
     @classmethod
     def from_env(cls) -> AppSettings:

@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import pytest
 
-from stylemind.models.domain import ProductRecord
+from stylemind.models.domain import PersonaSignals, ProductRecord
 from stylemind.models.enums import Aesthetic, BodyType, BudgetTier, Category, ColorPalette, Occasion, Season
-from stylemind.models.schemas import PersonaSignals, PersonaSnapshot
+from stylemind.models.schemas import PersonaSnapshot
 
 # ---------------------------------------------------------------------------
 # Enum exhaustiveness
