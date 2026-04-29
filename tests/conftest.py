@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from collections.abc import Generator
 from unittest.mock import AsyncMock, MagicMock
 
@@ -8,7 +7,7 @@ import pytest
 
 
 @pytest.fixture(autouse=True)
-def reset_config() -> Generator[None, None, None]:
+def reset_config() -> Generator[None]:
     from stylemind import config as cfg_module
 
     cfg_module._reset_config()

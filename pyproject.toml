@@ -9,8 +9,8 @@ description = "RAG-powered fashion styling assistant with Neo4j knowledge graph"
 requires-python = ">=3.14"
 dependencies = [
     "neo4j>=5.20",
-    "neo4j-graphrag[sentence-transformers]>=1.5,<2.0",
-    "sentence-transformers>=3.0",
+    "neo4j-graphrag>=1.5,<2.0",
+    "sentence-transformers>=5.0",
     "openai>=1.40",
     "fastapi>=0.115",
     "uvicorn[standard]>=0.30",

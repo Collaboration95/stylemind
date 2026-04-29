@@ -57,7 +57,7 @@ class Neo4jClient:
             raise RuntimeError("Neo4j driver not initialized. Call connect() first.")
         parameters = parameters or {}
         logger.debug("neo4j execute_query query_preview=%s param_count=%d", query[:80], len(parameters))
-        result = self._driver.execute_query(query, parameters, database_=database)
+        result = self._driver.execute_query(query, parameters, database_=database)  # type: ignore[arg-type]
         records = [record.data() for record in result.records]
         logger.debug("neo4j query returned row_count=%d", len(records))
         return records
