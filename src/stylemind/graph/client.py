@@ -77,9 +77,6 @@ class Neo4jClient:
         self.close()
 
 
-# FastAPI dependency — client is stored once on app.state in lifespan, not created per request.
-# In main.py lifespan: app.state.neo4j = Neo4jClient(get_config().neo4j); app.state.neo4j.connect()
-# This function simply returns the shared instance — no connection lifecycle here.
 def get_neo4j_client(request: Request) -> Neo4jClient:
     """FastAPI dependency: returns Neo4jClient stored on app.state."""
     return request.app.state.neo4j  # type: ignore[no-any-return]
