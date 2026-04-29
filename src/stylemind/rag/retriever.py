@@ -82,7 +82,12 @@ class ProductRetriever:
         Returns:
             list[RetrievedProduct] sorted by similarity_score descending.
         """
-        logger.info("retriever retrieve query_preview=%s top_k=%d min_threshold=%.2f", query[:80], self._top_k, self._min_threshold)
+        logger.info(
+            "retriever retrieve query_preview=%s top_k=%d min_threshold=%.2f",
+            query[:80],
+            self._top_k,
+            self._min_threshold,
+        )
 
         embedding = self._embedder.embed_query(query)
         logger.debug("retriever embedding_dims=%d", len(embedding))
