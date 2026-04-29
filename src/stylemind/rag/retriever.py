@@ -26,6 +26,7 @@ def _row_to_retrieved_product(row: dict[str, Any]) -> RetrievedProduct:
         occasions=row["occasions"] or [],
         colors=row["colors"] or [],
         seasons=row["seasons"] or [],
+        materials=row.get("materials") or [],
         pairs_with=row["pairs_with"] or [],
         similarity_score=row["score"],
     )
