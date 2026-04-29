@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from fastapi import APIRouter, Request, status
@@ -16,11 +17,11 @@ async def health(request: Request) -> JSONResponse:
     neo4j_ok = False
     embedder_ok = False
 
-    # Check Neo4j connectivity
+    # Check Neo4j connectivity (blocking driver call — run off the event loop)
     neo4j_client = getattr(request.app.state, "neo4j", None)
     if neo4j_client is not None:
         try:
-            neo4j_ok = neo4j_client.verify_connectivity()
+            neo4j_ok = await asyncio.to_thread(neo4j_client.verify_connectivity)
         except Exception as exc:
             logger.warning("health neo4j check failed error=%s", exc)
             neo4j_ok = False
