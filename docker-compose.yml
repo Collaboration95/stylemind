@@ -43,7 +43,7 @@ services:
     environment:
       POSTGRES_DB: langfuse
       POSTGRES_USER: langfuse
-      POSTGRES_PASSWORD: langfuse_secret
+      POSTGRES_PASSWORD: ${LANGFUSE_DB_PASSWORD:-changeme_langfuse_db}
     volumes:
       - langfuse_pg_data:/var/lib/postgresql/data
     healthcheck:
@@ -53,14 +53,14 @@ services:
       retries: 5
 
   langfuse-server:
-    image: langfuse/langfuse:2
+    image: langfuse/langfuse:3
     ports:
       - "3000:3000"
     environment:
-      DATABASE_URL: "postgresql://langfuse:langfuse_secret@langfuse-db:5432/langfuse"
-      NEXTAUTH_SECRET: "stylemind_langfuse_secret"
+      DATABASE_URL: "postgresql://langfuse:${LANGFUSE_DB_PASSWORD:-changeme_langfuse_db}@langfuse-db:5432/langfuse"
+      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:-changeme_langfuse_nextauth}
       NEXTAUTH_URL: "http://localhost:3000"
-      SALT: "stylemind_salt"
+      SALT: ${LANGFUSE_SALT:-changeme_langfuse_salt}
     depends_on:
       langfuse-db:
         condition: service_healthy
