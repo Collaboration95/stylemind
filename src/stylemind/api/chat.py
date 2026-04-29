@@ -40,7 +40,7 @@ async def _sse_stream(
     persona: PersonaSnapshot = PersonaSnapshot()
     if persona_manager is not None:
         try:
-            persona = persona_manager.get_persona(chat_request.user_id)
+            persona = await asyncio.to_thread(persona_manager.get_persona, chat_request.user_id)
         except Exception as exc:
             logger.warning("chat get_persona failed user_id=%s error=%s", chat_request.user_id, exc)
 
@@ -48,7 +48,7 @@ async def _sse_stream(
     retrieved_products = []
     if retriever is not None:
         try:
-            retrieved_products = retriever.retrieve(chat_request.message)
+            retrieved_products = await asyncio.to_thread(retriever.retrieve, chat_request.message)
         except Exception as exc:
             logger.warning("chat retrieve failed user_id=%s error=%s", chat_request.user_id, exc)
 
@@ -57,7 +57,7 @@ async def _sse_stream(
     rerank_results: list = []
     if reranker is not None and retrieved_products:
         try:
-            rerank_results = reranker.rerank(retrieved_products, persona, explain=chat_request.explain)
+            rerank_results = await asyncio.to_thread(reranker.rerank, retrieved_products, persona, chat_request.explain)
             reranked_products = [r.product for r in rerank_results]
         except Exception as exc:
             logger.warning("chat rerank failed user_id=%s error=%s", chat_request.user_id, exc)
@@ -69,10 +69,11 @@ async def _sse_stream(
             matched_product_id = generator.detect_product_interest(chat_request.message, reranked_products)
             if matched_product_id:
                 try:
-                    outfit = outfit_builder.build_outfit(
-                        product_id=matched_product_id,
-                        user_id=chat_request.user_id,
-                        persona=persona,
+                    outfit = await asyncio.to_thread(
+                        outfit_builder.build_outfit,
+                        matched_product_id,
+                        chat_request.user_id,
+                        persona,
                     )
                     logger.info("chat outfit built product_id=%s user_id=%s", matched_product_id, chat_request.user_id)
                 except Exception as exc:
@@ -117,22 +118,22 @@ async def _sse_stream(
 
     yield "data: [DONE]\n\n"
 
-    # 6. Fire-and-forget async persona update (does NOT block response)
+    # 7. Fire-and-forget async persona update (does NOT block response)
     if inference_engine is not None and persona_manager is not None:
         shown_product_ids = [p.product_id for p in reranked_products]
 
         async def _update_persona() -> None:
             try:
-                signals = inference_engine.extract_signals(
-                    message=chat_request.message,
-                    history=chat_request.history,
-                    shown_products=shown_product_ids,
+                signals = await asyncio.to_thread(
+                    inference_engine.extract_signals,
+                    chat_request.message,
+                    chat_request.history,
+                    shown_product_ids,
                 )
-                persona_manager.update_persona(chat_request.user_id, signals)
+                await asyncio.to_thread(persona_manager.update_persona, chat_request.user_id, signals)
                 logger.info("chat persona updated user_id=%s", chat_request.user_id)
 
-                # Log persona confidence as a custom Langfuse score
-                updated_persona = persona_manager.get_persona(chat_request.user_id)
+                updated_persona = await asyncio.to_thread(persona_manager.get_persona, chat_request.user_id)
                 score_persona_confidence(
                     user_id=chat_request.user_id,
                     confidence=updated_persona.confidence_score,
@@ -141,7 +142,7 @@ async def _sse_stream(
             except Exception as exc:
                 logger.warning("chat persona update failed user_id=%s error=%s", chat_request.user_id, exc)
 
-        asyncio.ensure_future(_update_persona())
+        asyncio.create_task(_update_persona())
 
 
 @router.post("/chat")
