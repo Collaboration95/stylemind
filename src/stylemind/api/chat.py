@@ -104,7 +104,7 @@ async def _sse_stream(
                 "product_id": p.product_id,
                 "name": p.name,
                 "brand": p.brand,
-                "price_inr": p.price,
+                "price_inr": p.price_inr,
                 "score": p.similarity_score,
             }
             for p in reranked_products

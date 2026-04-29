@@ -5,7 +5,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from stylemind.models.schemas import PersonaSignals, PersonaSnapshot
+from stylemind.models.domain import PersonaSignals
+from stylemind.models.schemas import PersonaSnapshot
 from stylemind.persona.inference import PersonaInferenceEngine  # noqa: I001
 from stylemind.persona.manager import PersonaManager
 

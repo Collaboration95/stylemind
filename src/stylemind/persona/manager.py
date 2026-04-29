@@ -6,7 +6,8 @@ from typing import Any
 
 from neo4j import Driver
 
-from stylemind.models.schemas import PersonaSignals, PersonaSnapshot
+from stylemind.models.domain import PersonaSignals
+from stylemind.models.schemas import PersonaSnapshot
 
 logger = logging.getLogger(__name__)
 

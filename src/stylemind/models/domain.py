@@ -27,7 +27,7 @@ class RetrievedProduct:
     product_id: str
     name: str
     description: str
-    price: int
+    price_inr: int
     category: str
     brand: str
     budget_tier: str
@@ -38,4 +38,20 @@ class RetrievedProduct:
     materials: list[str] = field(default_factory=list)
     pairs_with: list[str] = field(default_factory=list)
     similarity_score: float = 0.0
+
+
+@dataclass(frozen=True)
+class PersonaSignals:
+    liked_aesthetics: list[str] = field(default_factory=list)
+    disliked_materials: list[str] = field(default_factory=list)
+    mentioned_occasions: list[str] = field(default_factory=list)
+    budget_signal: str | None = None
+    color_preferences: list[str] = field(default_factory=list)
+    brand_mentions: list[str] = field(default_factory=list)
+    sentiment_on_shown: dict[str, str] = field(default_factory=dict)
+    signal_strength: float = 0.5
+
+    def __post_init__(self) -> None:
+        if not (0.0 <= self.signal_strength <= 1.0):
+            raise ValueError(f"signal_strength must be in [0.0, 1.0], got {self.signal_strength}")
 

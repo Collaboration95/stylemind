@@ -24,7 +24,7 @@ def make_product(
         product_id=product_id,
         name=name,
         description="A test product",
-        price=2000,
+        price_inr=2000,
         category=category,
         brand=brand,
         budget_tier=budget_tier,
