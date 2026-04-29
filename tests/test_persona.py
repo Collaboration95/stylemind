@@ -301,7 +301,7 @@ def test_persona_5_turn_evolution():
     # Track what would be stored in a simple in-memory structure
     stored_turn = 0
     stored_aesthetics: dict[str, dict] = {}  # name -> {weight, last_seen}
-    stored_budget_signals: list[str] = []
+    stored_budget_signals: list[dict[str, Any]] = []
 
     def execute_query_side_effect(query: str, params: dict, database_: str = "neo4j") -> MagicMock:
         nonlocal stored_turn
@@ -325,8 +325,8 @@ def test_persona_5_turn_evolution():
                 stored_aesthetics[name] = {"weight": w, "last_seen": t}
             result.records = []
 
-        elif "budget_signals" in query and "budget_signal" in params:
-            stored_budget_signals.append(params["budget_signal"])
+        elif "budget_signals" in query and "budget_entry" in params:
+            stored_budget_signals.append(params["budget_entry"])
             result.records = []
 
         elif "MATCH (sp:StylePersona" in query and "PREFERS" in query:

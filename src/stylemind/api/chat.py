@@ -111,9 +111,7 @@ async def _sse_stream(
         yield f"data: __JSON__{json.dumps({'sources': sources_payload})}\n\n"
 
     if chat_request.explain and rerank_results:
-        explain_payload = [
-            r.breakdown.to_dict() for r in rerank_results if r.breakdown is not None
-        ]
+        explain_payload = [r.breakdown.to_dict() for r in rerank_results if r.breakdown is not None]
         if explain_payload:
             yield f"data: __JSON__{json.dumps({'explain': explain_payload})}\n\n"
 

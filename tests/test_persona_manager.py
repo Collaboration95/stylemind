@@ -179,9 +179,7 @@ def test_weighted_budget_outranks_count() -> None:
 
     snapshot = manager.get_persona("user_weighted")
 
-    assert snapshot.budget_tier == "luxury", (
-        f"Expected 'luxury' (weighted 0.9 > 0.6), got {snapshot.budget_tier!r}"
-    )
+    assert snapshot.budget_tier == "luxury", f"Expected 'luxury' (weighted 0.9 > 0.6), got {snapshot.budget_tier!r}"
 
 
 @pytest.mark.unit

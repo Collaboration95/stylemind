@@ -272,7 +272,9 @@ def _make_rerank_results(products, explain=False):
                 budget_boost=0.0,
                 final_score=p.similarity_score + 0.04,
             )
-        results.append(RerankResult(product=p, final_score=p.similarity_score + (0.04 if explain else 0.0), breakdown=breakdown))
+        results.append(
+            RerankResult(product=p, final_score=p.similarity_score + (0.04 if explain else 0.0), breakdown=breakdown)
+        )
     return results
 
 
@@ -374,7 +376,9 @@ def test_chat_no_explain_event_when_explain_false():
 
 @pytest.mark.unit
 def test_score_breakdown_to_dict():
-    sb = ScoreBreakdown(product_id="P001", base_score=0.85, persona_boost=0.04, persona_penalty=0.0, budget_boost=0.02, final_score=0.91)
+    sb = ScoreBreakdown(
+        product_id="P001", base_score=0.85, persona_boost=0.04, persona_penalty=0.0, budget_boost=0.02, final_score=0.91
+    )
     d = sb.to_dict()
     assert d["product_id"] == "P001"
     assert d["base_score"] == pytest.approx(0.85)

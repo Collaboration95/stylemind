@@ -61,6 +61,7 @@ _PERSONA_JSON_SCHEMA = {
     "additionalProperties": False,
 }
 
+
 class PersonaInferenceEngine:
     def __init__(self, config: ExtractionLLMConfig) -> None:
         self._client = OpenAI(base_url=config.base_url, api_key=config.api_key)

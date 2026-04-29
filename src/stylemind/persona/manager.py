@@ -289,7 +289,10 @@ class PersonaManager:
                 try:
                     self._driver.execute_query(
                         SET_BUDGET_SIGNAL,
-                        {"user_id": user_id, "budget_entry": {"signal": signals.budget_signal, "weight": signals.signal_strength}},
+                        {
+                            "user_id": user_id,
+                            "budget_entry": {"signal": signals.budget_signal, "weight": signals.signal_strength},
+                        },
                         database_="neo4j",
                     )
                 except Exception as exc:
