@@ -45,6 +45,13 @@ class RetrievedProduct:
 
 @dataclass(frozen=True)
 class PersonaSignals:
+    """Structured signals extracted from a single chat turn by the PersonaInferenceEngine.
+
+    signal_strength reflects how much persona information was present in the turn
+    (0.0 = generic message, 1.0 = highly specific style intent).
+    sentiment_on_shown maps product_id → "positive" | "negative" | "neutral".
+    """
+
     liked_aesthetics: list[str] = field(default_factory=list)
     disliked_materials: list[str] = field(default_factory=list)
     mentioned_occasions: list[str] = field(default_factory=list)
