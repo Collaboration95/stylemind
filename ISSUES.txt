@@ -1,0 +1,119 @@
+StyleMind — UX & Observability Improvement Issues
+===================================================
+
+Derived from CLI interaction review (interaction.txt) and codebase audit.
+Organized into 3 stacked PRs, each building on the previous.
+
+
+================================================================================
+PR 1: CLI UX — /help, /exit fix, /debug-dev command
+================================================================================
+
+Issue 1.1 — /help command does nothing useful
+  Current: Typing "/help" sends the message to the chat API, which generates a
+  fashion recommendation in response (line 37-39 of interaction.txt).
+  Expected: /help should print all available slash commands with descriptions,
+  never hit the LLM.
+
+Issue 1.2 — /exit does not exit
+  Current: Only bare "quit" and "exit" trigger the exit branch (chat.py:52-54).
+  Typing "/exit" or "/quit" sends the message to the chat API.
+  Expected: /exit and /quit should also exit the CLI.
+
+Issue 1.3 — No /debug-dev command
+  There is no developer-facing introspection tool. For a take-home aimed at
+  demonstrating AI-engineering awareness, a /debug-dev command that shows the
+  accumulated persona signal diff (what was inferred this session, per turn)
+  without querying the DB is valuable. It proves the candidate thinks about
+  developer tooling, not just end-user UX.
+
+  Design:
+  - CLI keeps an in-memory list of (turn_number, raw_signals: PersonaSignals)
+    extracted per turn.
+  - /debug-dev renders this as a Rich table:
+      Turn | Aesthetics      | Materials | Budget | Occasions | Strength
+      1    | +Casual Min.    |           | budget | +Casual   | 0.70
+      2    |                 | -Linen    |        |           | 0.90
+  - Requires the server to return extracted signals in the SSE structured payload
+    so the CLI can capture them without a separate API call.
+
+Issue 1.4 — No /clear command
+  No way to clear conversation history mid-session. Useful for testing.
+
+
+================================================================================
+PR 2: LLM Prompt Improvements — tone, guardrails, persona injection
+================================================================================
+
+Issue 2.1 — System prompt lacks personality/tone
+  Current _SYSTEM_PROMPT in generator.py is functional but flat. The model
+  responds like a product database, not a stylist. For a fashion chatbot,
+  warmth and personality matter.
+
+  Improve:
+  - Add a conversational, fashion-forward tone directive.
+  - Encourage the model to explain *why* items work (occasion, pairing, body
+    shape), not just list products.
+  - Use language like "think of yourself as a friend who happens to know
+    fashion" — approachable but knowledgeable.
+
+Issue 2.2 — No guardrails / safety prompting
+  The model has no instructions to:
+  - Stay on fashion/style topics.
+  - Refuse medical, legal, financial, or harmful requests.
+  - Avoid body-shaming language.
+  - Decline to generate off-topic creative content (stories, code, etc.).
+
+  Add a guardrails block to the system prompt.
+
+Issue 2.3 — Persona context not injected into generation
+  The chat API handler (api/chat.py) retrieves the persona snapshot (step 1)
+  and uses it for reranking (step 3), but never passes it to the generator's
+  system prompt. The LLM has no idea about the user's inferred style profile.
+
+  Fix: Inject a "User Style Profile" section into the system prompt or user
+  context so the model can personalize language (e.g., "Since you lean toward
+  Casual Minimalism...").
+
+
+================================================================================
+PR 3: Langfuse Cloud Migration + Detailed Tracing
+================================================================================
+
+Issue 3.1 — Remove local Langfuse from docker-compose.yml
+  The .env already points to Langfuse Cloud (https://us.cloud.langfuse.com).
+  docker-compose.yml still defines langfuse-db (Postgres) and langfuse-server
+  services. These are dead weight — remove them, along with the "observability"
+  network and langfuse_pg_data volume.
+
+Issue 3.2 — Incomplete tracing coverage
+  Currently only 2 functions have @observe decorators:
+  - PersonaInferenceEngine.extract_signals (inference.py)
+  - ProductReranker.rerank (reranker.py)
+
+  Missing @observe on:
+  - ProductRetriever.retrieve (retriever.py)
+  - StyleMindGenerator.stream_response (generator.py)
+  - The top-level chat handler (_sse_stream in api/chat.py)
+  - PersonaManager.update_persona / get_persona (manager.py)
+  - OutfitBuilder.build_outfit (outfit/builder.py)
+
+  Add @observe across the pipeline for full trace visibility.
+
+Issue 3.3 — No cost / token tracking
+  Langfuse supports model cost and token tracking via generation spans.
+  Currently no token counts or model metadata are sent. For Groq (chat LLM)
+  and OpenAI (extraction LLM), capture usage.prompt_tokens,
+  usage.completion_tokens from the API response and attach to the Langfuse
+  span via langfuse_context or manual span updates.
+
+Issue 3.4 — Makefile `up` target references Langfuse
+  The `up` target echo message mentions "Langfuse: http://localhost:3000".
+  Update to reflect cloud-only setup.
+
+
+================================================================================
+Bonus: Neo4j Cypher Queries (not a PR — just reference queries)
+================================================================================
+
+Provided separately for visualizing per-user relationships in the graph.

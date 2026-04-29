@@ -118,31 +118,48 @@ async def _sse_stream(
 
     yield "data: [DONE]\n\n"
 
-    # 7. Fire-and-forget async persona update (does NOT block response)
+    # 7. Persona update — extract signals, persist, and return signals to client for /debug-dev
     if inference_engine is not None and persona_manager is not None:
         shown_product_ids = [p.product_id for p in reranked_products]
 
-        async def _update_persona() -> None:
-            try:
-                signals = await asyncio.to_thread(
-                    inference_engine.extract_signals,
-                    chat_request.message,
-                    chat_request.history,
-                    shown_product_ids,
-                )
-                await asyncio.to_thread(persona_manager.update_persona, chat_request.user_id, signals)
-                logger.info("chat persona updated user_id=%s", chat_request.user_id)
+        try:
+            signals = await asyncio.to_thread(
+                inference_engine.extract_signals,
+                chat_request.message,
+                chat_request.history,
+                shown_product_ids,
+            )
 
-                updated_persona = await asyncio.to_thread(persona_manager.get_persona, chat_request.user_id)
-                score_persona_confidence(
-                    user_id=chat_request.user_id,
-                    confidence=updated_persona.confidence_score,
-                    session_id=chat_request.user_id,
-                )
-            except Exception as exc:
-                logger.warning("chat persona update failed user_id=%s error=%s", chat_request.user_id, exc)
+            signals_payload = {
+                "signals": {
+                    "liked_aesthetics": signals.liked_aesthetics,
+                    "disliked_materials": signals.disliked_materials,
+                    "mentioned_occasions": signals.mentioned_occasions,
+                    "budget_signal": signals.budget_signal,
+                    "color_preferences": signals.color_preferences,
+                    "brand_mentions": signals.brand_mentions,
+                    "sentiment_on_shown": signals.sentiment_on_shown,
+                    "signal_strength": signals.signal_strength,
+                }
+            }
+            yield f"data: __JSON__{json.dumps(signals_payload)}\n\n"
 
-        asyncio.create_task(_update_persona())
+            async def _persist_persona() -> None:
+                try:
+                    await asyncio.to_thread(persona_manager.update_persona, chat_request.user_id, signals)
+                    logger.info("chat persona updated user_id=%s", chat_request.user_id)
+                    updated_persona = await asyncio.to_thread(persona_manager.get_persona, chat_request.user_id)
+                    score_persona_confidence(
+                        user_id=chat_request.user_id,
+                        confidence=updated_persona.confidence_score,
+                        session_id=chat_request.user_id,
+                    )
+                except Exception as exc:
+                    logger.warning("chat persona persist failed user_id=%s error=%s", chat_request.user_id, exc)
+
+            asyncio.create_task(_persist_persona())
+        except Exception as exc:
+            logger.warning("chat persona extraction failed user_id=%s error=%s", chat_request.user_id, exc)
 
 
 @router.post("/chat")
