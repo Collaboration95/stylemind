@@ -9,6 +9,7 @@ from stylemind.config import Neo4jConfig
 from stylemind.graph.client import Neo4jClient
 
 
+@pytest.mark.unit
 def test_neo4j_client_init_with_config():
     """Unit test: Neo4jClient initializes with config values."""
     config = Neo4jConfig(uri="bolt://test:7687", user="neo4j", password="test")

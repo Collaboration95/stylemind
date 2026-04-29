@@ -16,3 +16,18 @@ repos:
       - id: detect-private-key
       - id: no-commit-to-branch
         args: [--branch, main]
+
+  - repo: local
+    hooks:
+      - id: pyright
+        name: pyright type check
+        entry: uv run pyright
+        language: system
+        types: [python]
+        pass_filenames: false
+      - id: smoke-test
+        name: unit tests (smoke)
+        entry: uv run pytest -m unit -x -q --no-header
+        language: system
+        types: [python]
+        pass_filenames: false
