@@ -15,7 +15,7 @@ EXTRACTION_SYSTEM_PROMPT = """You are a fashion preference extraction system.
 Extract structured signals from user messages about their style preferences.
 
 Return JSON with these fields:
-- liked_aesthetics: list of aesthetic names from [Quiet Luxury, Old Money, Streetwear, Y2K, Boho, Athleisure, Business Casual, Casual Minimalism, Maximalist, Coastal Grandmother]
+- liked_aesthetics: list of aesthetic names from [Quiet Luxury, Old Money, Streetwear, Y2K, Athleisure, Cottagecore, Corporate Minimalism, Casual Minimalism, Coastal Grandma]
 - disliked_materials: list of materials explicitly disliked
 - mentioned_occasions: list of occasions from [Office, Date Night, Wedding Guest, Casual, Active, Travel, Formal, Brunch]
 - budget_signal: one of "budget", "mid", "premium", "luxury" or null

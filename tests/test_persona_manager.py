@@ -214,8 +214,6 @@ def test_update_persona_budget_signal_stored() -> None:
 @pytest.mark.unit
 def test_get_persona_with_decayed_aesthetics_sorted() -> None:
     """Aesthetics with higher effective weight appear first in preferred_aesthetics."""
-    # Quiet Luxury: weight=3.0, last_seen=5 (delta=0 → high effective)
-    # Boho: weight=1.0, last_seen=5 (delta=0 → lower effective)
     driver = _make_driver_with_records(
         [
             {
@@ -233,11 +231,33 @@ def test_get_persona_with_decayed_aesthetics_sorted() -> None:
 
     snapshot = manager.get_persona("user_sorted")
 
-    # Both should appear
     assert "Quiet Luxury" in snapshot.preferred_aesthetics
     assert "Boho" in snapshot.preferred_aesthetics
 
-    # Quiet Luxury should appear before Boho (higher weight = higher effective score)
     ql_idx = snapshot.preferred_aesthetics.index("Quiet Luxury")
     boho_idx = snapshot.preferred_aesthetics.index("Boho")
     assert ql_idx < boho_idx, "Quiet Luxury (higher weight) should rank before Boho"
+
+
+@pytest.mark.unit
+def test_first_write_weight_not_doubled() -> None:
+    """First MERGE with weight 0.6 should store 0.6, not 1.2."""
+    driver = _make_update_driver(turn_count=1)
+    manager = _make_manager(driver)
+
+    signals = PersonaSignals(liked_aesthetics=["Quiet Luxury"], signal_strength=0.6)
+    manager.update_persona("user_weight_test", signals)
+
+    calls = driver.execute_query.call_args_list
+    prefers_call = None
+    for call in calls:
+        query_str = str(call)
+        if "PREFERS" in query_str:
+            prefers_call = call
+            break
+
+    assert prefers_call is not None, "Expected a PREFERS MERGE call"
+    query = prefers_call[0][0] if prefers_call[0] else prefers_call.kwargs.get("query_", "")
+    assert "ON CREATE SET r.weight = 0" in query, (
+        "MERGE query should initialize weight to 0 on CREATE to prevent doubling"
+    )

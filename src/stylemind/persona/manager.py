@@ -26,7 +26,7 @@ MERGE_PREFERS_AESTHETIC = """
 MATCH (sp:StylePersona {user_id: $user_id})
 MATCH (a:Aesthetic {name: $aesthetic_name})
 MERGE (sp)-[r:PREFERS]->(a)
-ON CREATE SET r.weight = $weight, r.last_seen_turn = $turn
+ON CREATE SET r.weight = 0, r.last_seen_turn = $turn
 SET r.weight = r.weight + $weight, r.last_seen_turn = $turn
 """
 
@@ -34,7 +34,7 @@ MERGE_DISLIKES_MATERIAL = """
 MATCH (sp:StylePersona {user_id: $user_id})
 MATCH (m:Material {name: $material_name})
 MERGE (sp)-[r:DISLIKES]->(m)
-ON CREATE SET r.weight = $weight, r.last_seen_turn = $turn
+ON CREATE SET r.weight = 0, r.last_seen_turn = $turn
 SET r.weight = r.weight + $weight, r.last_seen_turn = $turn
 """
 
@@ -42,7 +42,7 @@ MERGE_DISLIKES_PRODUCT = """
 MATCH (sp:StylePersona {user_id: $user_id})
 MATCH (p:Product {product_id: $product_id})
 MERGE (sp)-[r:DISLIKES]->(p)
-ON CREATE SET r.weight = $weight, r.last_seen_turn = $turn
+ON CREATE SET r.weight = 0, r.last_seen_turn = $turn
 SET r.weight = r.weight + $weight, r.last_seen_turn = $turn
 """
 
@@ -50,7 +50,7 @@ MERGE_SHOPS_AT_BRAND = """
 MATCH (sp:StylePersona {user_id: $user_id})
 MATCH (b:Brand {name: $brand_name})
 MERGE (sp)-[r:SHOPS_AT]->(b)
-ON CREATE SET r.weight = $weight, r.last_seen_turn = $turn
+ON CREATE SET r.weight = 0, r.last_seen_turn = $turn
 SET r.weight = r.weight + $weight, r.last_seen_turn = $turn
 """
 
@@ -82,7 +82,7 @@ MERGE_INTERESTED_IN_OCCASION = """
 MATCH (sp:StylePersona {user_id: $user_id})
 MATCH (o:Occasion {name: $occasion_name})
 MERGE (sp)-[r:INTERESTED_IN]->(o)
-ON CREATE SET r.weight = $weight, r.last_seen_turn = $turn
+ON CREATE SET r.weight = 0, r.last_seen_turn = $turn
 SET r.weight = r.weight + $weight, r.last_seen_turn = $turn
 """
 
