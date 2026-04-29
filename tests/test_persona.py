@@ -217,56 +217,73 @@ def test_confidence_after_5_turns():
     assert score > 0.5
 
 
+def _make_tx_driver(turn_count: int = 1) -> MagicMock:
+    """Build a driver that supports the transaction-based update_persona API."""
+    driver = MagicMock()
+
+    mock_record = MagicMock()
+    mock_record.data.return_value = {"turn_count": turn_count}
+    mock_run_result = MagicMock()
+    mock_run_result.__iter__ = MagicMock(return_value=iter([mock_record]))
+
+    mock_tx = MagicMock()
+    mock_tx.run.return_value = mock_run_result
+    mock_tx.__enter__ = MagicMock(return_value=mock_tx)
+    mock_tx.__exit__ = MagicMock(return_value=False)
+
+    mock_session = MagicMock()
+    mock_session.begin_transaction.return_value = mock_tx
+    mock_session.__enter__ = MagicMock(return_value=mock_session)
+    mock_session.__exit__ = MagicMock(return_value=False)
+
+    driver.session.return_value = mock_session
+    return driver
+
+
 @pytest.mark.unit
 def test_update_persona_calls_merge_style_persona():
-    """update_persona calls execute_query at least once to merge StylePersona node."""
-    mock_result = MagicMock()
-    mock_record = MagicMock()
-    mock_record.data.return_value = {"turn_count": 1}
-    mock_result.records = [mock_record]
-
-    driver = MagicMock()
-    driver.execute_query.return_value = mock_result
-
+    """update_persona opens a session, begins a transaction and calls tx.run at least once."""
+    driver = _make_tx_driver(turn_count=1)
     manager = _make_manager(driver)
-    signals = PersonaSignals(liked_aesthetics=["Quiet Luxury"], signal_strength=0.8)
 
+    signals = PersonaSignals(liked_aesthetics=["Quiet Luxury"], signal_strength=0.8)
     manager.update_persona("user_abc", signals)
 
-    # At minimum, MERGE_STYLE_PERSONA and MERGE_PREFERS_AESTHETIC should have been called
-    assert driver.execute_query.call_count >= 2
+    driver.session.assert_called_once_with(database="neo4j")
+    mock_session = driver.session.return_value.__enter__.return_value
+    mock_session.begin_transaction.assert_called_once()
+
+    mock_tx = mock_session.begin_transaction.return_value.__enter__.return_value
+    # MERGE_STYLE_PERSONA + at least one BATCH_MERGE_AESTHETICS
+    assert mock_tx.run.call_count >= 2
 
 
 @pytest.mark.unit
 def test_update_persona_negative_sentiment_merges_dislikes_product():
-    """Negative sentiment_on_shown triggers DISLIKES -> Product merge."""
-    mock_result = MagicMock()
-    mock_record = MagicMock()
-    mock_record.data.return_value = {"turn_count": 1}
-    mock_result.records = [mock_record]
-
-    driver = MagicMock()
-    driver.execute_query.return_value = mock_result
-
+    """Negative sentiment_on_shown triggers a DISLIKES product UNWIND batch query."""
+    driver = _make_tx_driver(turn_count=1)
     manager = _make_manager(driver)
-    signals = PersonaSignals(sentiment_on_shown={"P001": "negative", "P002": "positive"}, signal_strength=0.7)
 
+    signals = PersonaSignals(sentiment_on_shown={"P001": "negative", "P002": "positive"}, signal_strength=0.7)
     manager.update_persona("user_xyz", signals)
 
-    # Check that a call was made with product_id P001 (negative)
-    calls = [str(call) for call in driver.execute_query.call_args_list]
-    dislike_calls = [c for c in calls if "P001" in c]
-    assert len(dislike_calls) > 0
+    mock_session = driver.session.return_value.__enter__.return_value
+    mock_tx = mock_session.begin_transaction.return_value.__enter__.return_value
 
-    # P002 (positive) should NOT appear in dislikes
-    dislikes_p002 = [c for c in calls if "P002" in c]
-    assert len(dislikes_p002) == 0
+    all_calls_str = [str(c) for c in mock_tx.run.call_args_list]
+
+    # P001 (negative) should appear in a DISLIKES call
+    dislike_calls = [c for c in all_calls_str if "P001" in c]
+    assert len(dislike_calls) > 0, "Expected a tx.run call containing P001 (negative sentiment)"
+
+    # P002 (positive) must NOT appear in any call
+    p002_calls = [c for c in all_calls_str if "P002" in c]
+    assert len(p002_calls) == 0, "P002 (positive sentiment) must not appear in any DISLIKES call"
 
 
 @pytest.mark.unit
 def test_get_persona_with_aesthetics_and_decay():
     """Persona with aesthetic preferences returns sorted decayed aesthetics."""
-    # Simulate turn_count=5, one aesthetic seen at turn 3
     driver = _make_driver_with_records(
         [
             {
@@ -277,12 +294,12 @@ def test_get_persona_with_aesthetics_and_decay():
                     {"aesthetic": "Boho", "weight": 1.0, "last_seen": 5},
                 ],
                 "dislikes": [],
+                "occasions": [],
+                "disliked_product_ids": [],
             }
         ]
     )
-    manager = _make_manager(driver)
-
-    snapshot = manager.get_persona("user_test")
+    snapshot = _make_manager(driver).get_persona("user_test")
 
     assert "Quiet Luxury" in snapshot.preferred_aesthetics or "Boho" in snapshot.preferred_aesthetics
     assert snapshot.confidence_score > 0.0
@@ -295,64 +312,77 @@ def test_get_persona_with_aesthetics_and_decay():
 
 @pytest.mark.integration
 def test_persona_5_turn_evolution():
-    """Integration: simulate 5 turns of persona updates and verify evolution.
+    """Integration: simulate 5 turns of persona updates and verify state evolution.
 
-    This test mocks Neo4j but simulates full update/get cycles across 5 turns
-    to verify the persona snapshot evolves correctly.
+    Intercepts both the transaction-based update_persona writes and the single
+    execute_query read to simulate an in-memory Neo4j store.
     """
-    # Track what would be stored in a simple in-memory structure
     stored_turn = 0
-    stored_aesthetics: dict[str, dict] = {}  # name -> {weight, last_seen}
+    stored_aesthetics: dict[str, dict] = {}
     stored_budget_signals: list[dict[str, Any]] = []
 
-    def execute_query_side_effect(query: str, params: dict, database_: str = "neo4j") -> MagicMock:
+    # ---- transaction tx.run interceptor (update_persona writes) ----
+    def tx_run_side_effect(query: str, params: dict) -> MagicMock:
         nonlocal stored_turn
-
         result = MagicMock()
 
         if "sp.turn_count = sp.turn_count + 1" in query:
             stored_turn += 1
             rec = MagicMock()
             rec.data.return_value = {"turn_count": stored_turn}
-            result.records = [rec]
-
-        elif "PREFERS" in query and "aesthetic_name" in params:
-            name = params["aesthetic_name"]
-            w = params["weight"]
-            t = params["turn"]
-            if name in stored_aesthetics:
-                stored_aesthetics[name]["weight"] += w
-                stored_aesthetics[name]["last_seen"] = t
-            else:
-                stored_aesthetics[name] = {"weight": w, "last_seen": t}
-            result.records = []
-
-        elif "budget_signals" in query and "budget_entry" in params:
+            result.__iter__ = MagicMock(return_value=iter([rec]))
+        elif "PREFERS" in query and "items" in params:
+            for item in params.get("items", []):
+                name = item["name"]
+                w = params["weight"]
+                t = params["turn"]
+                if name in stored_aesthetics:
+                    stored_aesthetics[name]["weight"] += w
+                    stored_aesthetics[name]["last_seen"] = t
+                else:
+                    stored_aesthetics[name] = {"weight": w, "last_seen": t}
+            result.__iter__ = MagicMock(return_value=iter([]))
+        elif "budget_entry" in params:
             stored_budget_signals.append(params["budget_entry"])
-            result.records = []
-
-        elif "MATCH (sp:StylePersona" in query and "PREFERS" in query:
-            # GET_PERSONA_DATA query
-            rec = MagicMock()
-            prefs = [
-                {"aesthetic": n, "weight": v["weight"], "last_seen": v["last_seen"]}
-                for n, v in stored_aesthetics.items()
-            ]
-            rec.data.return_value = {
-                "turn_count": stored_turn,
-                "budget_signals": stored_budget_signals if stored_budget_signals else None,
-                "preferences": prefs,
-                "dislikes": [],
-            }
-            result.records = [rec]
-
+            result.__iter__ = MagicMock(return_value=iter([]))
         else:
-            result.records = []
+            result.__iter__ = MagicMock(return_value=iter([]))
 
         return result
 
+    mock_tx = MagicMock()
+    mock_tx.run.side_effect = tx_run_side_effect
+    mock_tx.__enter__ = MagicMock(return_value=mock_tx)
+    mock_tx.__exit__ = MagicMock(return_value=False)
+
+    mock_session = MagicMock()
+    mock_session.begin_transaction.return_value = mock_tx
+    mock_session.__enter__ = MagicMock(return_value=mock_session)
+    mock_session.__exit__ = MagicMock(return_value=False)
+
+    # ---- execute_query interceptor (get_persona single read) ----
+    def execute_query_side_effect(query: str, params: dict, database_: str = "neo4j") -> MagicMock:
+        prefs = [
+            {"aesthetic": n, "weight": v["weight"], "last_seen": v["last_seen"]}
+            for n, v in stored_aesthetics.items()
+        ]
+        rec = MagicMock()
+        rec.data.return_value = {
+            "turn_count": stored_turn,
+            "budget_signals": stored_budget_signals if stored_budget_signals else None,
+            "preferences": prefs,
+            "dislikes": [],
+            "occasions": [],
+            "disliked_product_ids": [],
+        }
+        result = MagicMock()
+        result.records = [rec]
+        return result
+
     driver = MagicMock()
+    driver.session.return_value = mock_session
     driver.execute_query.side_effect = execute_query_side_effect
+
     manager = _make_manager(driver)
 
     signals_sequence = [
@@ -369,11 +399,7 @@ def test_persona_5_turn_evolution():
 
     snapshot = manager.get_persona(user_id)
 
-    # After 5 turns: Quiet Luxury should be top aesthetic (mentioned 4 times)
     assert "Quiet Luxury" in snapshot.preferred_aesthetics
-    # Budget should be "premium" (most common: 2 premium vs 1 luxury)
     assert snapshot.budget_tier == "premium"
-    # Confidence should be > 0 since we've accumulated signals
     assert snapshot.confidence_score > 0.0
-    # Turn count should be 5
     assert stored_turn == 5
