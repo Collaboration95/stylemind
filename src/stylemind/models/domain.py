@@ -48,6 +48,7 @@ class RetrievedProduct:
     occasions: list[str] = field(default_factory=list)
     colors: list[str] = field(default_factory=list)
     seasons: list[str] = field(default_factory=list)
+    materials: list[str] = field(default_factory=list)
     pairs_with: list[str] = field(default_factory=list)
     similarity_score: float = 0.0
 

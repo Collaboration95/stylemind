@@ -202,12 +202,14 @@ OPTIONAL MATCH (p)-[:FITS_OCCASION]->(o:Occasion)
 OPTIONAL MATCH (p)-[:IN_COLOR]->(cp:ColorPalette)
 OPTIONAL MATCH (p)-[:BEST_IN_SEASON]->(s:Season)
 OPTIONAL MATCH (p)-[:AT_TIER]->(bt:BudgetTier)
+OPTIONAL MATCH (p)-[:MADE_FROM]->(m:Material)
 OPTIONAL MATCH (p)-[:PAIRS_WITH]-(partner:Product)
 WITH p, b, bt, score,
      collect(DISTINCT a.name) AS aesthetics,
      collect(DISTINCT o.name) AS occasions,
      collect(DISTINCT cp.name) AS colors,
      collect(DISTINCT s.name) AS seasons,
+     collect(DISTINCT m.name) AS materials,
      collect(DISTINCT partner.product_id) AS pairs_with
 RETURN p.product_id AS product_id,
        p.name AS name,
@@ -216,6 +218,6 @@ RETURN p.product_id AS product_id,
        p.category AS category,
        b.name AS brand,
        coalesce(bt.label, p.budget_tier) AS budget_tier,
-       aesthetics, occasions, colors, seasons, pairs_with, score
+       aesthetics, occasions, colors, seasons, materials, pairs_with, score
 ORDER BY score DESC
 """

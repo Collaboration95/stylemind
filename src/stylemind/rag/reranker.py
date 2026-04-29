@@ -77,15 +77,13 @@ class ProductReranker:
 
             # --- persona penalty ---
             persona_penalty = 0.0
-            if confidence > 0.0 and persona.disliked_materials:
-                # Penalise if any candidate aesthetic or category signals a disliked material context.
-                # We compare lowercased tokens broadly so "Cotton" matches "cotton blend" etc.
+            if confidence > 0.0:
                 disliked_lower = {m.lower() for m in persona.disliked_materials}
-                candidate_tokens = {candidate.category.lower(), candidate.brand.lower()}
-                for aesthetic in candidate.aesthetics:
-                    candidate_tokens.add(aesthetic.lower())
-                if candidate_tokens & disliked_lower:
-                    persona_penalty = _PERSONA_PENALTY * confidence
+                candidate_materials_lower = {m.lower() for m in candidate.materials}
+                if candidate_materials_lower & disliked_lower:
+                    persona_penalty += _PERSONA_PENALTY * confidence
+                if persona.disliked_products and candidate.product_id in persona.disliked_products:
+                    persona_penalty += _PERSONA_PENALTY * confidence
 
             # --- budget boost ---
             budget_boost = 0.0
