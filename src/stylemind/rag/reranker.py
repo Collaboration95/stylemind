@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 from stylemind.models.domain import RetrievedProduct
 from stylemind.models.schemas import PersonaSnapshot
+from stylemind.observability import observe
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +45,7 @@ class ProductReranker:
     def __init__(self, persona_weight: float = 0.3) -> None:
         self._persona_weight = persona_weight
 
+    @observe(name="rerank")
     def rerank(
         self,
         candidates: list[RetrievedProduct],

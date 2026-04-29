@@ -5,6 +5,7 @@ import logging
 from neo4j import Driver
 
 from stylemind.models.schemas import OutfitItemSchema, OutfitSuggestion, PersonaSnapshot, ProductSummary
+from stylemind.observability import observe
 
 logger = logging.getLogger(__name__)
 
@@ -114,6 +115,7 @@ class OutfitBuilder:
     def __init__(self, driver: Driver) -> None:
         self._driver = driver
 
+    @observe(name="build_outfit")
     def build_outfit(
         self,
         product_id: str,

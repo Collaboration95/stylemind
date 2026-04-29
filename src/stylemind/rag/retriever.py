@@ -5,6 +5,7 @@ from typing import Any
 
 from stylemind.graph.client import Neo4jClient
 from stylemind.models.domain import RetrievedProduct
+from stylemind.observability import observe
 from stylemind.rag.embedder import Embedder
 
 logger = logging.getLogger(__name__)
@@ -73,6 +74,7 @@ class ProductRetriever:
         self._top_k = top_k
         self._min_threshold = min_threshold
 
+    @observe(name="retrieve")
     def retrieve(self, query: str) -> list[RetrievedProduct]:
         """Embed the query text, run vector search, and return ranked products.
 
