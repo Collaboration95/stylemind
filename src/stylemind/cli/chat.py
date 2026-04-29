@@ -64,7 +64,7 @@ class ChatCLI:
         while True:
             try:
                 user_input = prompt("You: ").strip()
-            except (EOFError, KeyboardInterrupt):
+            except EOFError, KeyboardInterrupt:
                 self.console.print("\n[dim]Goodbye![/dim]")
                 break
 
