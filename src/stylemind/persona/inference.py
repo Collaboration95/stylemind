@@ -136,6 +136,15 @@ class PersonaInferenceEngine:
             data = json.loads(raw_content)
             signals = PersonaSignals(**data)
 
+            if hasattr(response, "usage") and response.usage is not None:
+                logger.info(
+                    "persona extraction token_usage model=%s prompt_tokens=%d completion_tokens=%d total_tokens=%d",
+                    self._model,
+                    response.usage.prompt_tokens or 0,
+                    response.usage.completion_tokens or 0,
+                    response.usage.total_tokens or 0,
+                )
+
             logger.info(
                 "persona signals extracted signal_strength=%.2f liked_aesthetics=%s",
                 signals.signal_strength,
