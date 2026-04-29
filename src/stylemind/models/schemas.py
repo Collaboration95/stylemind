@@ -27,6 +27,8 @@ class ProductSummary(BaseModel):
 
 
 class OutfitItemSchema(BaseModel):
+    """A single paired item in an outfit suggestion, with graph-path justification."""
+
     product_id: str
     name: str
     category: str
@@ -46,7 +48,11 @@ class OutfitSuggestion(BaseModel):
 
 
 class PersonaSnapshot(BaseModel):
-    """Matches spec R5 exactly."""
+    """Current inferred style persona for a user.
+
+    All fields default to empty/zero so the first-turn snapshot is valid
+    without any prior conversation history.
+    """
 
     model_config = ConfigDict(extra="ignore")
 
