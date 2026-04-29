@@ -8,6 +8,7 @@ from openai import AsyncOpenAI
 
 from stylemind.config import ChatLLMConfig
 from stylemind.models.domain import RetrievedProduct
+from stylemind.observability import observe
 
 if TYPE_CHECKING:
     from stylemind.models.schemas import OutfitSuggestion
@@ -108,6 +109,7 @@ class StyleMindGenerator:
         self._config = config
         self._client = AsyncOpenAI(base_url=config.base_url, api_key=config.api_key)
 
+    @observe(name="stream_response")
     async def stream_response(
         self,
         message: str,
@@ -143,11 +145,19 @@ class StyleMindGenerator:
             messages=messages,  # type: ignore[arg-type]
             temperature=self._config.temperature,
             stream=True,
+            stream_options={"include_usage": True},
         )
 
         async for chunk in stream:
             if not chunk.choices:
-                logger.debug("generator received chunk with empty choices array model=%s", self._config.model)
+                if hasattr(chunk, "usage") and chunk.usage is not None:
+                    logger.info(
+                        "generator token_usage model=%s prompt_tokens=%d completion_tokens=%d total_tokens=%d",
+                        self._config.model,
+                        chunk.usage.prompt_tokens or 0,
+                        chunk.usage.completion_tokens or 0,
+                        chunk.usage.total_tokens or 0,
+                    )
                 continue
             delta = chunk.choices[0].delta.content
             if delta:
