@@ -202,8 +202,8 @@ OPTIONAL MATCH (p)-[:FITS_OCCASION]->(o:Occasion)
 OPTIONAL MATCH (p)-[:IN_COLOR]->(cp:ColorPalette)
 OPTIONAL MATCH (p)-[:BEST_IN_SEASON]->(s:Season)
 OPTIONAL MATCH (p)-[:AT_TIER]->(bt:BudgetTier)
-OPTIONAL MATCH (p)-[:PAIRS_WITH|<-[:PAIRS_WITH]]-(partner:Product)
-WITH p, b, score,
+OPTIONAL MATCH (p)-[:PAIRS_WITH]-(partner:Product)
+WITH p, b, bt, score,
      collect(DISTINCT a.name) AS aesthetics,
      collect(DISTINCT o.name) AS occasions,
      collect(DISTINCT cp.name) AS colors,
