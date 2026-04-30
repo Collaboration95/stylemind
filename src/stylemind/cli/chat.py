@@ -118,7 +118,7 @@ class ChatCLI:
             "just natural conversation. Tell me what you're looking for and I'll",
             "find pieces that match your vibe.",
             "",
-            f"[dim]Session:[/dim] [bold]{self.user_id}[/bold]",
+            f"[dim]Session:[/dim] [bold]{self.user_id}[/bold] [dim](new session — your style starts fresh!)[/dim]",
             "",
             "[dim]Try one of these to get started:[/dim]",
         ]

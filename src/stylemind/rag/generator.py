@@ -64,7 +64,14 @@ def _format_persona_context(persona: dict[str, object] | None) -> str:
         parts.append(f"Dislikes these materials (AVOID recommending): {', '.join(disliked)}")  # type: ignore[arg-type]
     budget = persona.get("budget_tier")
     if budget:
-        parts.append(f"Budget tier: {budget}")
+        budget_hints = {
+            "budget": "Budget-conscious — prioritise affordable picks and call out value",
+            "mid": "Mid-range budget — balance quality and price",
+            "premium": "Premium budget — can suggest higher-end pieces",
+            "luxury": "Luxury budget — price is not a concern, focus on quality and exclusivity",
+        }
+        hint = budget_hints.get(str(budget).lower(), budget)
+        parts.append(f"Budget tier: {hint}")
     occasions = persona.get("top_occasions", [])
     if occasions:
         parts.append(f"Preferred occasions: {', '.join(occasions)}")  # type: ignore[arg-type]

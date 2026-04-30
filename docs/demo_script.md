@@ -280,6 +280,30 @@ The CLI prints a session ID on startup. Keep it visible or note it for curl comm
 
 ---
 
+## Bonus: Showcasing New CLI Features
+
+After Turn 5, you can optionally demonstrate these features to highlight developer experience and UX polish:
+
+### /outfit Command
+```
+You (turn 6): /outfit Silk Slip Cami
+```
+This builds a complete outfit via PAIRS_WITH graph traversal — no LLM call needed. Show the outfit table with anchor + paired items, each with a justification. Point out the category diversification (max 1 per category).
+
+### /debug-dev Command
+```
+You (turn 6): /debug-dev
+```
+This shows the full persona signal log for the session — one row per turn with extracted aesthetics, materials, budget, occasions, and signal strength. Narrate: "This is a developer tool — it shows every inference the system made, turn by turn, without querying the database."
+
+### Tab-Completion
+Start typing a product name and press Tab — the CLI autocompletes from all 51 products. Narrate: "Product names are loaded at startup for instant autocomplete."
+
+### Conversation Starters
+On a fresh session, the welcome screen shows 3 random conversation starters. Type `1`, `2`, or `3` to use one. Narrate: "For users who aren't sure what to ask, we provide curated starting points."
+
+---
+
 ## Key Moments to Emphasize in the Recording
 
 ### Streaming Speed
@@ -312,7 +336,7 @@ The CLI prints a session ID on startup. Keep it visible or note it for curl comm
 
 - **Duration:** Target 4–5 minutes. Aim for ~30 seconds per turn plus ~30 seconds for intro and ~30 seconds for closing summary.
 - **Font size:** Set terminal font to at least 16pt before recording. In iTerm2: Preferences > Profiles > Text > Font size.
-- **No secrets visible:** Do not show API key values. Use `echo "GROQ_API_KEY is set: yes"` style checks rather than `echo $GROQ_API_KEY`.
+- **No secrets visible:** Do not show API key values. Keys are loaded from `.env` automatically.
 - **Layout:** Use a 50/50 horizontal split. Left pane: chat CLI. Right pane: `/persona` output (re-run after each turn, clear between turns with `clear`).
 - **Cursor guidance:** Move the mouse cursor to highlight key values in the persona JSON after each turn — viewers need to know where to look.
 - **Do not rush Turn 4:** The outfit builder output takes a moment to appear (graph traversal + coherence filter + LLM stream). Let it render fully before narrating.
