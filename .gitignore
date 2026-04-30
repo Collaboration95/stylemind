@@ -227,3 +227,9 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 .claude/worktrees/
+
+# Internal docs (kept locally, excluded from repo)
+docs/
+ISSUES.txt
+AGENTS.md
+CLAUDE.md
