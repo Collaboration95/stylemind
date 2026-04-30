@@ -97,25 +97,11 @@ sequenceDiagram
 
 ### Persona inference & storage
 
-```mermaid
-flowchart LR
-    Msg["User message"] --> IE["InferenceEngine\nLlama 3.3 70B"]
-    IE -->|"PersonaSignals\n(aesthetics, materials,\noccasions, budget)"| PM["PersonaManager"]
-    PM -->|"UNWIND batch writes\nin single transaction"| Neo4j[("Neo4j\nStylePersona node\n+ relationship edges")]
-    Neo4j -->|"GET_PERSONA_ALL\n(single query)"| Snap["PersonaSnapshot\n(decay-weighted)"]
-    Snap --> RAG["RAG reranking\n+ outfit building"]
-```
+![Persona inference & storage](assets/persona-inference.png)
 
 ### Outfit builder graph traversal
 
-```mermaid
-flowchart TD
-    Anchor["Anchor product\n(user expressed interest)"] -->|"PAIRS_WITH"| Candidates["Paired candidates"]
-    Candidates --> Filter["Coherence filter\n≥1 season overlap\n≥1 occasion overlap"]
-    Filter --> Rank["Persona ranking\n(aesthetic + occasion match)"]
-    Rank --> Dedup["Deduplicate by category\n(max 1 item per category)"]
-    Dedup --> Outfit["OutfitSuggestion\n(anchor + ≤4 items)"]
-```
+![Outfit builder graph traversal](assets/graph-traversal.png)
 
 ## Observability
 
