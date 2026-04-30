@@ -1,27 +1,20 @@
 # Design Decisions
 
 ## Neo4j as unified graph + vector store
-
 Products, relationships, and 384-dim embeddings live in one database. Vector search and graph traversal run in a single Cypher pipeline, eliminating sync complexity and the fan-out latency of a separate vector DB.
 
-## Framework-free
-
-No LangChain, no LlamaIndex. Every retrieval step, reranking pass, and prompt template is explicit Python. When something breaks or behaves unexpectedly, there is no abstraction layer to blame.
 
 ## Split-model architecture
 
 Groq + Llama 3.3 70B handles both streaming chat (sub-200 ms TTFT) and structured persona extraction (JSON-schema conformance). A single provider simplifies setup while remaining swappable via environment variables.
 
 ## Provider-agnostic LLM clients
-
-Both clients are `OpenAI(base_url=..., api_key=...)`. Swapping providers is two environment variable changes. No SDK rewrites, no abstraction layer needed.
+clients are `OpenAI(base_url=..., api_key=...)`. Swapping providers is two environment variable changes.
 
 ## Silent persona inference
-
-The system never asks users what they like. Preferences are extracted from conversational signals (liked aesthetics, disliked materials, budget cues, sentiment on shown products) after every turn. Asking directly breaks conversational flow and primes users to game the system.
+The system never asks users what they like. Preferences are extracted from conversational signals (liked aesthetics, disliked materials, budget cues, sentiment on shown products) after every turn. 
 
 ## Outfit coherence via graph traversal
-
 Outfit candidates are validated by requiring ≥1 season overlap AND ≥1 occasion overlap using `PAIRS_WITH` edges in Neo4j. This is deterministic and explainable. Letting the LLM guess outfit coherence would produce plausible-sounding but fashion-incoherent combinations.
 
 ---
