@@ -3,7 +3,7 @@
 
   <h1>StyleMind</h1>
 
-  <p><strong>An AI-powered fashion styling assistant that silently learns your taste through conversation — no style quiz, no explicit preferences asked.</strong></p>
+  <p><strong>An AI-powered fashion styling assistant that silently learns your taste through conversation </strong></p>
 
   <p>
     StyleMind combines a Neo4j knowledge graph, vector similarity search, and a two-LLM pipeline to deliver persona-aware outfit recommendations that improve with every message.
