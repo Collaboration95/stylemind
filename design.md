@@ -1,0 +1,96 @@
+# Design Decisions
+
+## Neo4j as unified graph + vector store
+
+Products, relationships, and 384-dim embeddings live in one database. Vector search and graph traversal run in a single Cypher pipeline, eliminating sync complexity and the fan-out latency of a separate vector DB.
+
+## Framework-free
+
+No LangChain, no LlamaIndex. Every retrieval step, reranking pass, and prompt template is explicit Python. When something breaks or behaves unexpectedly, there is no abstraction layer to blame.
+
+## Split-model architecture
+
+Groq + Llama 3.3 70B handles both streaming chat (sub-200 ms TTFT) and structured persona extraction (JSON-schema conformance). A single provider simplifies setup while remaining swappable via environment variables.
+
+## Provider-agnostic LLM clients
+
+Both clients are `OpenAI(base_url=..., api_key=...)`. Swapping providers is two environment variable changes. No SDK rewrites, no abstraction layer needed.
+
+## Silent persona inference
+
+The system never asks users what they like. Preferences are extracted from conversational signals (liked aesthetics, disliked materials, budget cues, sentiment on shown products) after every turn. Asking directly breaks conversational flow and primes users to game the system.
+
+## Outfit coherence via graph traversal
+
+Outfit candidates are validated by requiring ≥1 season overlap AND ≥1 occasion overlap using `PAIRS_WITH` edges in Neo4j. This is deterministic and explainable. Letting the LLM guess outfit coherence would produce plausible-sounding but fashion-incoherent combinations.
+
+---
+
+# Environment Variables
+
+All configuration is via `.env`. See `.env.example` for the full list with defaults.
+
+**Required:**
+
+| Variable | Description |
+|----------|-------------|
+| `CHAT_API_KEY` | API key for the chat LLM provider (Groq by default) |
+| `EXTRACTION_API_KEY` | API key for the extraction LLM (Groq by default) |
+| `NEO4J_PASSWORD` | Neo4j password (must match `NEO4J_AUTH` in docker-compose) |
+
+All other variables have sensible defaults. The chat and extraction LLMs are swappable via `CHAT_BASE_URL` / `EXTRACTION_BASE_URL` — any OpenAI-compatible endpoint works.
+
+---
+
+# Local Development
+
+```bash
+# 1. Install dependencies
+uv sync --dev
+
+# 2. Start Neo4j
+docker-compose up neo4j -d
+
+# 3. Copy and edit env
+cp .env.example .env
+# Set CHAT_API_KEY, EXTRACTION_API_KEY, NEO4J_PASSWORD at minimum
+
+# 4. Seed the graph and embed products
+uv run python scripts/seed.py
+uv run python scripts/embed.py
+
+# 5. Start the API server
+uv run uvicorn stylemind.main:app --reload
+
+# 6. Or launch the CLI (starts server automatically in background)
+uv run python -m stylemind
+```
+
+**Pre-commit hooks** (ruff, pyright, unit tests):
+
+```bash
+uv run pre-commit install
+```
+
+**Running tests:**
+
+```bash
+make test                  # all tests
+pytest -m unit             # unit tests only (no Neo4j required)
+pytest -m integration      # integration tests (requires Neo4j running)
+pytest -m performance      # benchmarks
+```
+
+---
+
+# Troubleshooting
+
+**`NEO4J_PASSWORD` not set** — Copy `.env.example` to `.env` and fill in the required values.
+
+**Neo4j not ready** — The CLI polls `/health` for up to 30s. Check `docker-compose logs neo4j` and ensure the password matches `NEO4J_AUTH` in `docker-compose.yml`.
+
+**Empty responses** — Run `uv run python scripts/embed.py`. Products need embeddings before vector search works.
+
+**Persona not updating** — Persona updates are fire-and-forget. Check logs for `chat persona update failed`. Common causes: Neo4j blip or missing `EXTRACTION_API_KEY`.
+
+**Langfuse traces not appearing** — Verify `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY` are set. The app degrades gracefully if Langfuse is unavailable.

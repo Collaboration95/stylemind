@@ -30,7 +30,7 @@ flowchart TD
 ## Quick Start
 
 ```bash
-cp .env.example .env        # set CHAT_API_KEY (Groq), EXTRACTION_API_KEY (OpenAI), NEO4J_PASSWORD
+cp .env.example .env        # set CHAT_API_KEY (Groq), EXTRACTION_API_KEY (Groq), NEO4J_PASSWORD
 docker-compose up --build   # seed + embed run automatically on startup
 ```
 
@@ -125,7 +125,7 @@ flowchart TD
     Candidates --> Filter["Coherence filter\n≥1 season overlap\n≥1 occasion overlap"]
     Filter --> Rank["Persona ranking\n(aesthetic + occasion match)"]
     Rank --> Dedup["Deduplicate by category\n(max 1 item per category)"]
-    Dedup --> Outfit["OutfitSuggestion\n(anchor + ≤3 items)"]
+    Dedup --> Outfit["OutfitSuggestion\n(anchor + ≤4 items)"]
 ```
 
 ## Observability
@@ -143,7 +143,7 @@ The `/debug-dev` CLI command provides a local alternative — all persona signal
 
 | Document | Description |
 |----------|-------------|
-| [Design Decisions & Dev Setup](docs/design.md) | Architecture rationale, environment variables, local development, troubleshooting |
+| [Design Decisions & Dev Setup](design.md) | Architecture rationale, environment variables, local development, troubleshooting |
 | [Gap Analysis](docs/gap_analysis.md) | Requirement compliance matrix |
 | [Future Improvements](docs/planning_future_improvements.md) | P2/P3 design docs with effort estimates |
 | [Demo Script](docs/demo_script.md) | 5-turn walkthrough for screen recording |

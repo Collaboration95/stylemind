@@ -100,7 +100,7 @@ class LangfuseConfig:
         return cls(
             public_key=get_optional_variable("LANGFUSE_PUBLIC_KEY", ""),
             secret_key=get_optional_variable("LANGFUSE_SECRET_KEY", ""),
-            host=get_optional_variable("LANGFUSE_HOST", "http://localhost:3000"),
+            host=get_optional_variable("LANGFUSE_HOST", "https://us.cloud.langfuse.com"),
         )
 
 
