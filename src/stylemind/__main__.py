@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import sys
 import threading
@@ -15,6 +16,12 @@ from stylemind.cli.chat import ChatCLI
 _DEFAULT_PORT = 8000
 _HEALTH_TIMEOUT = 30
 _HEALTH_POLL_INTERVAL = 0.5
+
+
+def _quiet_logging() -> None:
+    """Suppress server/library logs in CLI mode so only the Rich UI is visible."""
+    for name in ("stylemind", "langfuse", "neo4j", "sentence_transformers", "httpx", "httpcore"):
+        logging.getLogger(name).setLevel(logging.ERROR)
 
 
 def _start_server(port: int) -> None:
@@ -38,6 +45,7 @@ def _wait_for_server(port: int, timeout: int = _HEALTH_TIMEOUT) -> bool:
 
 def main() -> None:
     load_dotenv()
+    _quiet_logging()
     port = int(os.environ.get("SERVER_PORT", str(_DEFAULT_PORT)))
 
     if _wait_for_server(port, timeout=2):
