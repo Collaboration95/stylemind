@@ -1,4 +1,16 @@
-**StyleMind is a RAG-powered fashion chatbot that silently learns your style persona through conversation and recommends outfits via Neo4j graph traversal.**
+<div align="center">
+  <img src="assets/logo.png" alt="StyleMind" width="220" />
+
+  <h1>StyleMind</h1>
+
+  <p><strong>An AI-powered fashion styling assistant that silently learns your taste through conversation — no style quiz, no explicit preferences asked.</strong></p>
+
+  <p>
+    StyleMind combines a Neo4j knowledge graph, vector similarity search, and a two-LLM pipeline to deliver persona-aware outfit recommendations that improve with every message.
+  </p>
+</div>
+
+---
 
 ## Architecture
 
