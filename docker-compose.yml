@@ -60,56 +60,9 @@ services:
         reservations:
           memory: "512M"
 
-  langfuse-db:
-    image: postgres:16-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: langfuse
-      POSTGRES_USER: langfuse
-      POSTGRES_PASSWORD: ${LANGFUSE_DB_PASSWORD:-changeme_langfuse_db}
-    volumes:
-      - langfuse_pg_data:/var/lib/postgresql/data
-    networks:
-      - observability
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U langfuse"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    deploy:
-      resources:
-        limits:
-          cpus: "0.5"
-          memory: "512M"
-
-  langfuse-server:
-    image: langfuse/langfuse:2
-    restart: unless-stopped
-    ports:
-      - "3000:3000"
-    environment:
-      DATABASE_URL: "postgresql://langfuse:${LANGFUSE_DB_PASSWORD:-changeme_langfuse_db}@langfuse-db:5432/langfuse"
-      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:-changeme_langfuse_nextauth}
-      NEXTAUTH_URL: "http://localhost:3000"
-      SALT: ${LANGFUSE_SALT:-changeme_langfuse_salt}
-      TELEMETRY_ENABLED: "false"
-    depends_on:
-      langfuse-db:
-        condition: service_healthy
-    networks:
-      - observability
-    deploy:
-      resources:
-        limits:
-          cpus: "1.0"
-          memory: "1G"
-
 networks:
   backend:
-    driver: bridge
-  observability:
     driver: bridge
 
 volumes:
   neo4j_data:
-  langfuse_pg_data:

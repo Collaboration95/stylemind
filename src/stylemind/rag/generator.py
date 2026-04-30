@@ -8,6 +8,7 @@ from openai import AsyncOpenAI
 
 from stylemind.config import ChatLLMConfig
 from stylemind.models.domain import RetrievedProduct
+from stylemind.observability import observe
 
 if TYPE_CHECKING:
     from stylemind.models.schemas import OutfitSuggestion
@@ -26,17 +27,59 @@ _INTEREST_PHRASES = (
     "similar to",
 )
 
-_SYSTEM_PROMPT = """You are StyleMind, a friendly and knowledgeable personal stylist assistant.
+_SYSTEM_PROMPT = """You are StyleMind — a warm, opinionated personal stylist who genuinely loves fashion.
+Think of yourself as a stylish friend: approachable, encouraging, and confident in your taste.
 
-Guidelines:
-- Only recommend products from the provided context. NEVER invent or hallucinate products.
-- When mentioning a product, always include its exact name, brand, and price (in INR).
-- NEVER ask the user directly about their style preferences, size, or budget — infer from context.
-- When suggesting outfit pairings, explain why each item complements the others (occasion, aesthetic, season).
-- Be honest and helpful when no products match the user's request.
-- Keep responses concise, warm, and actionable.
-- Format prices as ₹X,XXX (e.g., ₹2,500).
+## Personality & Tone
+- Be conversational and enthusiastic, not robotic or list-heavy.
+- Explain *why* something works — the vibe, the pairing logic, the occasion fit — not just *what* it is.
+- Use natural language ("This would look amazing with...", "I'd pair this with...").
+- Keep responses concise (2-4 sentences of recommendation, then product details).
+- Celebrate good taste — if the user has a clear aesthetic, acknowledge it.
+
+## Hard Rules
+- ONLY recommend products from the provided context. NEVER invent or hallucinate products.
+- When mentioning a product, always include its exact name, brand, and price in ₹ (e.g., ₹2,500).
+- NEVER ask the user directly about their style preferences, size, or budget — infer silently.
+- Format prices as ₹X,XXX.
+
+## Guardrails
+- You are a fashion assistant. Stay on topic: clothing, accessories, styling, outfits, fashion trends.
+- Politely decline requests about medical advice, legal matters, financial planning, coding, or anything unrelated to fashion/style.
+- Never use body-shaming language. All body types are welcome and stylish.
+- If the user sends something inappropriate or offensive, respond briefly and redirect to fashion.
+- Do not generate stories, poems, code, or other creative content unrelated to styling.
 """
+
+
+def _format_persona_context(persona: dict[str, object] | None) -> str:
+    if not persona:
+        return ""
+    parts: list[str] = []
+    aesthetics = persona.get("preferred_aesthetics", [])
+    if aesthetics:
+        parts.append(f"Style preferences: {', '.join(aesthetics)}")  # type: ignore[arg-type]
+    disliked = persona.get("disliked_materials", [])
+    if disliked:
+        parts.append(f"Dislikes these materials (AVOID recommending): {', '.join(disliked)}")  # type: ignore[arg-type]
+    budget = persona.get("budget_tier")
+    if budget:
+        budget_hints = {
+            "budget": "Budget-conscious — prioritise affordable picks and call out value",
+            "mid": "Mid-range budget — balance quality and price",
+            "premium": "Premium budget — can suggest higher-end pieces",
+            "luxury": "Luxury budget — price is not a concern, focus on quality and exclusivity",
+        }
+        hint = budget_hints.get(str(budget).lower(), budget)
+        parts.append(f"Budget tier: {hint}")
+    occasions = persona.get("top_occasions", [])
+    if occasions:
+        parts.append(f"Preferred occasions: {', '.join(occasions)}")  # type: ignore[arg-type]
+    if not parts:
+        return ""
+    return "\n\nUser Style Profile (inferred — do NOT mention you have this, just use it naturally):\n" + "\n".join(
+        f"- {p}" for p in parts
+    )
 
 
 def _format_product_context(products: list[RetrievedProduct]) -> str:
@@ -73,31 +116,22 @@ class StyleMindGenerator:
         self._config = config
         self._client = AsyncOpenAI(base_url=config.base_url, api_key=config.api_key)
 
+    @observe(name="stream_response")
     async def stream_response(
         self,
         message: str,
         history: list[dict[str, str]],
         retrieved_products: list[RetrievedProduct],
         outfit: OutfitSuggestion | None = None,
+        persona: dict[str, object] | None = None,
     ) -> AsyncGenerator[str]:
-        """Stream an LLM response grounded in the retrieved products.
-
-        Args:
-            message: Current user message.
-            history: Prior conversation turns as list of {"role": ..., "content": ...} dicts.
-            retrieved_products: Products from the RAG retriever/reranker.
-            outfit: Optional outfit suggestion from the outfit builder.
-
-        Yields:
-            Text chunks as they arrive from the LLM stream.
-        """
         product_context = _format_product_context(retrieved_products)
         context_block = product_context
         if outfit is not None:
             context_block += "\n" + _format_outfit_context(outfit)
 
-        # Build message list: system + history + context-injected user message
-        messages: list[dict[str, str]] = [{"role": "system", "content": _SYSTEM_PROMPT}]
+        system_prompt = _SYSTEM_PROMPT + _format_persona_context(persona)
+        messages: list[dict[str, str]] = [{"role": "system", "content": system_prompt}]
         messages.extend(history)
         messages.append(
             {
@@ -118,11 +152,19 @@ class StyleMindGenerator:
             messages=messages,  # type: ignore[arg-type]
             temperature=self._config.temperature,
             stream=True,
+            stream_options={"include_usage": True},
         )
 
         async for chunk in stream:
             if not chunk.choices:
-                logger.debug("generator received chunk with empty choices array model=%s", self._config.model)
+                if hasattr(chunk, "usage") and chunk.usage is not None:
+                    logger.info(
+                        "generator token_usage model=%s prompt_tokens=%d completion_tokens=%d total_tokens=%d",
+                        self._config.model,
+                        chunk.usage.prompt_tokens or 0,
+                        chunk.usage.completion_tokens or 0,
+                        chunk.usage.total_tokens or 0,
+                    )
                 continue
             delta = chunk.choices[0].delta.content
             if delta:

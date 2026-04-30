@@ -10,6 +10,7 @@ from neo4j import Driver
 
 from stylemind.models.domain import PersonaSignals
 from stylemind.models.schemas import PersonaSnapshot
+from stylemind.observability import observe
 
 logger = logging.getLogger(__name__)
 
@@ -131,8 +132,8 @@ class PersonaManager:
         self._decay_rate = decay_rate
         self._expected_signals_per_turn = expected_signals_per_turn
 
+    @observe(name="get_persona")
     def get_persona(self, user_id: str) -> PersonaSnapshot:
-        """Return persona snapshot. Returns empty default on first turn, NEVER None."""
         try:
             result = _retry(
                 lambda: self._driver.execute_query(GET_PERSONA_ALL, {"user_id": user_id}, database_="neo4j")
@@ -215,8 +216,8 @@ class PersonaManager:
             confidence_score=confidence,
         )
 
+    @observe(name="update_persona")
     def update_persona(self, user_id: str, signals: PersonaSignals) -> None:
-        """Merge persona signals into Neo4j inside a single transaction."""
         try:
             with self._driver.session(database="neo4j") as session, session.begin_transaction() as tx:
                 # Increment turn_count and get current turn

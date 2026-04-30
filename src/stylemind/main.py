@@ -11,7 +11,9 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from stylemind.api import chat as chat_router
 from stylemind.api import health as health_router
+from stylemind.api import outfit as outfit_router
 from stylemind.api import persona as persona_router
+from stylemind.api import products as products_router
 from stylemind.config import get_config
 from stylemind.observability import init_langfuse
 
@@ -152,6 +154,8 @@ def create_app() -> FastAPI:
     # Routers
     app.include_router(chat_router.router)
     app.include_router(persona_router.router)
+    app.include_router(outfit_router.router)
+    app.include_router(products_router.router)
     app.include_router(health_router.router)
 
     return app

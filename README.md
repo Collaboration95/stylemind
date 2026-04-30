@@ -22,7 +22,7 @@ flowchart TD
     InferenceEngine --> ExtractionLLM["Extraction LLM\nOpenAI gpt-4.1-nano"]
 
     Persona --> PersonaManager["PersonaManager"]
-    PersonaManager --> Langfuse["Langfuse\nobservability · localhost:3000"]
+    PersonaManager --> Langfuse["Langfuse Cloud\nobservability · tracing"]
 
     FastAPI -- "fire-and-forget\npersona update loop" --> Persona
 ```
@@ -34,14 +34,16 @@ cp .env.example .env        # edit .env — set CHAT_API_KEY (Groq) and EXTRACTI
 docker-compose up --build   # seed + embed scripts run automatically on startup
 ```
 
-That's it. The app is available at `http://localhost:8000`. Langfuse at `http://localhost:3000`. Neo4j Browser at `http://localhost:7474`.
+That's it. The app is available at `http://localhost:8000`. Neo4j Browser at `http://localhost:7474`. Traces are sent to [Langfuse Cloud](https://us.cloud.langfuse.com) (configure keys in `.env`).
 
 ## API Endpoints
 
 | Method | Endpoint | Description | Request | Response |
 |--------|----------|-------------|---------|----------|
-| `POST` | `/chat` | Streaming chat with persona-aware RAG | `ChatRequest { user_id, message, history, explain }` | SSE stream of tokens + optional explain block |
+| `POST` | `/chat` | Streaming chat with persona-aware RAG | `ChatRequest { user_id, message, history, explain }` | SSE stream of tokens + structured JSON events |
 | `GET` | `/persona/{user_id}` | Current inferred persona snapshot | — | `PersonaSnapshot` JSON |
+| `GET` | `/outfit/{product_id}` | Build a coherent outfit around an anchor product | `?user_id=` (optional) | `OutfitSuggestion` JSON |
+| `GET` | `/products/names` | List all product names with IDs (for autocomplete) | — | `list[{product_id, name, brand}]` |
 | `GET` | `/health` | Liveness check (Neo4j + embedder) | — | `200 OK` or `503` |
 
 ## CLI Usage
@@ -54,8 +56,15 @@ Within the chat session:
 
 | Command | Action |
 |---------|--------|
+| `/help` | Show all available commands and conversation starters |
 | `/persona` | Print the current inferred persona snapshot |
-| `quit` / `exit` | End the session |
+| `/outfit <name>` | Build a complete outfit around a product (fuzzy name matching + tab-complete) |
+| `/debug-dev` | Show per-turn persona signals extracted this session (developer tool) |
+| `/clear` | Clear conversation history and start fresh |
+| `/exit` or `/quit` | End the session (also: `quit`, `exit`) |
+| `1` / `2` / `3` | Use a conversation starter (shown on welcome screen) |
+
+Product names support **tab-completion** — start typing and press Tab.
 
 ## Design Decisions
 
@@ -69,7 +78,7 @@ Within the chat session:
 
 - **Silent persona inference** — the system never asks users what they like. Preferences are extracted from conversational signals (liked aesthetics, disliked materials, budget cues, sentiment on shown products) after every turn. Asking directly breaks conversational flow and primes users to game the system.
 
-- **Langfuse for turn-level observability** — `@observe` spans on retrieve, rerank, extract_signals, and build_outfit. `score_persona_confidence` is logged each turn. Debugging RAG quality and persona drift requires turn-level traces, not aggregate metrics.
+- **Langfuse Cloud for turn-level observability** — `@observe` spans on retrieve, rerank, extract_signals, stream_response, get_persona, update_persona, and build_outfit. Token usage logged per LLM call. `score_persona_confidence` emitted each turn. Debugging RAG quality and persona drift requires turn-level traces, not aggregate metrics. Local Langfuse removed from docker-compose — cloud-hosted reduces infra complexity and makes traces accessible anywhere.
 
 - **Outfit coherence via graph traversal** — outfit candidates are validated by requiring ≥1 season overlap AND ≥1 occasion overlap using `PAIRS_WITH` edges in Neo4j. This is deterministic and explainable. Letting the LLM guess outfit coherence would produce plausible-sounding but fashion-incoherent combinations.
 
@@ -150,7 +159,7 @@ tests/                 # pytest, asyncio_mode=auto, unit/integration/e2e/perform
 # 1. Install dependencies
 uv sync --dev
 
-# 2. Start Neo4j only (skip Langfuse if not needed)
+# 2. Start Neo4j
 docker-compose up neo4j -d
 
 # 3. Copy and edit env
@@ -251,10 +260,12 @@ flowchart TD
 
 | Service | URL | Credentials |
 |---------|-----|-------------|
-| Langfuse | http://localhost:3000 | set in `.env` |
-| Neo4j Browser | http://localhost:7474 | `neo4j` / set in `.env` |
+| Langfuse Cloud | https://us.cloud.langfuse.com | `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` in `.env` |
+| Neo4j Browser | http://localhost:7474 | `neo4j` / `NEO4J_PASSWORD` in `.env` |
 
-Langfuse captures per-turn spans for retrieval, reranking, persona extraction, and outfit building. `score_persona_confidence` is emitted each turn, enabling drift detection over sessions.
+Langfuse captures per-turn spans for retrieval, reranking, persona extraction, generation, and outfit building. Token usage (prompt/completion/total) is logged for both Chat LLM and Extraction LLM. `score_persona_confidence` is emitted each turn, enabling drift detection over sessions.
+
+The `/debug-dev` CLI command provides a local, no-network alternative: it shows all persona signals extracted during the current session as a Rich table — useful for rapid iteration without opening the Langfuse dashboard.
 
 ## Tech Stack
 
@@ -267,5 +278,5 @@ Langfuse captures per-turn spans for retrieval, reranking, persona extraction, a
 | Embeddings | all-MiniLM-L6-v2 | Local, 384 dims, no API key |
 | API | FastAPI + SSE | Streaming tokens, async lifespan |
 | CLI | Rich + prompt-toolkit | Embeds FastAPI server in background thread |
-| Observability | Langfuse (self-hosted) | `@observe` spans, persona confidence scores |
+| Observability | Langfuse Cloud | `@observe` spans across full pipeline, token usage, persona confidence scores |
 | Packaging | Docker (two-stage, non-root) | `docker-compose up --build` starts everything |

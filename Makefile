@@ -75,7 +75,7 @@ db-down:
 
 up:
 	BUILDX_BUILDER=desktop-linux docker compose up --build -d
-	@echo "App: http://localhost:8000  Neo4j: http://localhost:7474  Langfuse: http://localhost:3000"
+	@echo "App: http://localhost:8000  Neo4j: http://localhost:7474  Langfuse: https://us.cloud.langfuse.com (cloud)"
 
 down:
 	docker compose down

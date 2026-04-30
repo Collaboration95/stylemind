@@ -26,9 +26,11 @@ class Embedder(Protocol):
 class LocalEmbedder:
     """sentence-transformers/all-MiniLM-L6-v2 (384 dims, no API key required)."""
 
-    def __init__(self, model_name: str = "sentence-transformers/all-MiniLM-L6-v2") -> None:
+    def __init__(self, model_name: str = "sentence-transformers/all-MiniLM-L6-v2", *, lazy: bool = False) -> None:
         self._model_name = model_name
         self._model = None
+        if not lazy:
+            self._get_model()
 
     def _get_model(self):
         if self._model is None:
