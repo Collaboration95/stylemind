@@ -35,44 +35,6 @@ All other variables have sensible defaults. The chat and extraction LLMs are swa
 
 ---
 
-# Local Development
-
-```bash
-# 1. Install dependencies
-uv sync --dev
-
-# 2. Start Neo4j
-docker-compose up neo4j -d
-
-# 3. Copy and edit env
-cp .env.example .env
-# Set CHAT_API_KEY, EXTRACTION_API_KEY, NEO4J_PASSWORD at minimum
-
-# 4. Seed the graph and embed products
-uv run python scripts/seed.py
-uv run python scripts/embed.py
-
-# 5. Start the API server
-uv run uvicorn stylemind.main:app --reload
-
-# 6. Or launch the CLI (starts server automatically in background)
-uv run python -m stylemind
-```
-
-**Pre-commit hooks** (ruff, pyright, unit tests):
-
-```bash
-uv run pre-commit install
-```
-
-**Running tests:**
-
-```bash
-make test                  # all tests
-pytest -m unit             # unit tests only (no Neo4j required)
-pytest -m integration      # integration tests (requires Neo4j running)
-pytest -m performance      # benchmarks
-```
 
 ---
 
