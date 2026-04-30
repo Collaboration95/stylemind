@@ -144,6 +144,3 @@ The `/debug-dev` CLI command provides a local alternative — all persona signal
 | Document | Description |
 |----------|-------------|
 | [Design Decisions & Dev Setup](design.md) | Architecture rationale, environment variables, local development, troubleshooting |
-| [Gap Analysis](docs/gap_analysis.md) | Requirement compliance matrix |
-| [Future Improvements](docs/planning_future_improvements.md) | P2/P3 design docs with effort estimates |
-| [Demo Script](docs/demo_script.md) | 5-turn walkthrough for screen recording |
