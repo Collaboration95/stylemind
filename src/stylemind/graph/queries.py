@@ -217,7 +217,7 @@ RETURN p.product_id AS product_id,
        p.price_inr AS price_inr,
        p.category AS category,
        b.name AS brand,
-       coalesce(bt.label, p.budget_tier) AS budget_tier,
+       coalesce(bt.label, 'unknown') AS budget_tier,
        aesthetics, occasions, colors, seasons, materials, pairs_with, score
 ORDER BY score DESC
 """
@@ -252,7 +252,7 @@ RETURN p.product_id AS product_id,
        p.price_inr AS price_inr,
        p.category AS category,
        b.name AS brand,
-       coalesce(bt.label, p.budget_tier) AS budget_tier,
+       coalesce(bt.label, 'unknown') AS budget_tier,
        aesthetics, occasions, colors, seasons, materials, pairs_with, score
 ORDER BY score DESC
 LIMIT $top_k

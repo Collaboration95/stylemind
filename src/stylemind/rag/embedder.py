@@ -42,7 +42,7 @@ class LocalEmbedder:
 
     def embed_query(self, text: str) -> list[float]:
         model = self._get_model()
-        embedding = model.encode(text, normalize_embeddings=True)
+        embedding = model.encode(text, normalize_embeddings=True, show_progress_bar=False)
         return embedding.tolist()
 
     def embed_batch(self, texts: list[str]) -> list[list[float]]:
