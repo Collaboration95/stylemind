@@ -135,21 +135,13 @@ async def _sse_stream(
         if explain_payload:
             yield f"data: __JSON__{json.dumps({'explain': explain_payload})}\n\n"
 
-    yield "data: [DONE]\n\n"
-
-    # 6b. Score response latency in Langfuse
-    turn_elapsed_ms = (time.monotonic() - turn_start) * 1000
-    if langfuse_context is not None:
-        with contextlib.suppress(Exception):
-            langfuse_context.score_current_observation(name="response_latency_ms", value=turn_elapsed_ms)
-    logger.info("chat response_latency_ms=%.1f user_id=%s", turn_elapsed_ms, chat_request.user_id)
-
-    # 7. Persona update — extract signals, persist, and return signals to client for /debug-dev
+    # 6b. Extract and emit persona signals BEFORE [DONE] so the CLI receives them
+    extracted_signals = None
     if inference_engine is not None and persona_manager is not None:
         shown_product_ids = [p.product_id for p in reranked_products]
 
         try:
-            signals = await asyncio.to_thread(
+            extracted_signals = await asyncio.to_thread(
                 inference_engine.extract_signals,
                 chat_request.message,
                 chat_request.history,
@@ -158,34 +150,46 @@ async def _sse_stream(
 
             signals_payload = {
                 "signals": {
-                    "liked_aesthetics": signals.liked_aesthetics,
-                    "disliked_materials": signals.disliked_materials,
-                    "mentioned_occasions": signals.mentioned_occasions,
-                    "budget_signal": signals.budget_signal,
-                    "color_preferences": signals.color_preferences,
-                    "brand_mentions": signals.brand_mentions,
-                    "sentiment_on_shown": signals.sentiment_on_shown,
-                    "signal_strength": signals.signal_strength,
+                    "liked_aesthetics": extracted_signals.liked_aesthetics,
+                    "disliked_materials": extracted_signals.disliked_materials,
+                    "mentioned_occasions": extracted_signals.mentioned_occasions,
+                    "budget_signal": extracted_signals.budget_signal,
+                    "color_preferences": extracted_signals.color_preferences,
+                    "brand_mentions": extracted_signals.brand_mentions,
+                    "sentiment_on_shown": extracted_signals.sentiment_on_shown,
+                    "signal_strength": extracted_signals.signal_strength,
                 }
             }
             yield f"data: __JSON__{json.dumps(signals_payload)}\n\n"
-
-            async def _persist_persona() -> None:
-                try:
-                    await asyncio.to_thread(persona_manager.update_persona, chat_request.user_id, signals)
-                    logger.info("chat persona updated user_id=%s", chat_request.user_id)
-                    updated_persona = await asyncio.to_thread(persona_manager.get_persona, chat_request.user_id)
-                    score_persona_confidence(
-                        user_id=chat_request.user_id,
-                        confidence=updated_persona.confidence_score,
-                        session_id=chat_request.user_id,
-                    )
-                except Exception as exc:
-                    logger.warning("chat persona persist failed user_id=%s error=%s", chat_request.user_id, exc)
-
-            asyncio.create_task(_persist_persona())
         except Exception as exc:
             logger.warning("chat persona extraction failed user_id=%s error=%s", chat_request.user_id, exc)
+
+    yield "data: [DONE]\n\n"
+
+    # 7. Score response latency in Langfuse
+    turn_elapsed_ms = (time.monotonic() - turn_start) * 1000
+    if langfuse_context is not None:
+        with contextlib.suppress(Exception):
+            langfuse_context.score_current_observation(name="response_latency_ms", value=turn_elapsed_ms)
+    logger.info("chat response_latency_ms=%.1f user_id=%s", turn_elapsed_ms, chat_request.user_id)
+
+    # 8. Fire-and-forget persona persistence (after [DONE] — only DB write, no client output)
+    if extracted_signals is not None and persona_manager is not None:
+
+        async def _persist_persona() -> None:
+            try:
+                await asyncio.to_thread(persona_manager.update_persona, chat_request.user_id, extracted_signals)
+                logger.info("chat persona updated user_id=%s", chat_request.user_id)
+                updated_persona = await asyncio.to_thread(persona_manager.get_persona, chat_request.user_id)
+                score_persona_confidence(
+                    user_id=chat_request.user_id,
+                    confidence=updated_persona.confidence_score,
+                    session_id=chat_request.user_id,
+                )
+            except Exception as exc:
+                logger.warning("chat persona persist failed user_id=%s error=%s", chat_request.user_id, exc)
+
+        asyncio.create_task(_persist_persona())
 
 
 @router.post("/chat")
