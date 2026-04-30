@@ -66,9 +66,9 @@ class ExtractionLLMConfig:
     @classmethod
     def from_env(cls) -> ExtractionLLMConfig:
         return cls(
-            base_url=get_optional_variable("EXTRACTION_BASE_URL", "https://api.openai.com/v1"),
+            base_url=get_optional_variable("EXTRACTION_BASE_URL", "https://api.groq.com/openai/v1"),
             api_key=get_required_variable("EXTRACTION_API_KEY"),
-            model=get_optional_variable("EXTRACTION_MODEL", "gpt-4.1-nano"),
+            model=get_optional_variable("EXTRACTION_MODEL", "llama-3.3-70b-versatile"),
         )
 
 

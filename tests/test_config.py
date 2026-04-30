@@ -44,8 +44,8 @@ class TestConfigLoadsFromEnv:
         assert config.chat_llm.base_url == "https://api.groq.com/openai/v1"
         assert config.chat_llm.model == "llama-3.3-70b-versatile"
         assert config.extraction_llm.api_key == "test-extraction-key"
-        assert config.extraction_llm.base_url == "https://api.openai.com/v1"
-        assert config.extraction_llm.model == "gpt-4.1-nano"
+        assert config.extraction_llm.base_url == "https://api.groq.com/openai/v1"
+        assert config.extraction_llm.model == "llama-3.3-70b-versatile"
         assert config.embedding.provider == "local"
         assert config.embedding.model_name == "sentence-transformers/all-MiniLM-L6-v2"
         assert config.embedding.dimensions == 384
@@ -89,8 +89,8 @@ class TestOptionalVarsUseDefaults:
         assert config.chat_llm.base_url == "https://api.groq.com/openai/v1"
         assert config.chat_llm.model == "llama-3.3-70b-versatile"
         assert config.chat_llm.temperature == 0.7
-        assert config.extraction_llm.base_url == "https://api.openai.com/v1"
-        assert config.extraction_llm.model == "gpt-4.1-nano"
+        assert config.extraction_llm.base_url == "https://api.groq.com/openai/v1"
+        assert config.extraction_llm.model == "llama-3.3-70b-versatile"
         assert config.embedding.provider == "local"
         assert config.embedding.model_name == "sentence-transformers/all-MiniLM-L6-v2"
         assert config.embedding.dimensions == 384

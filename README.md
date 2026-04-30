@@ -19,7 +19,7 @@ flowchart TD
     RAG --> Generator
 
     Persona --> InferenceEngine["InferenceEngine"]
-    InferenceEngine --> ExtractionLLM["Extraction LLM\nOpenAI gpt-4.1-nano"]
+    InferenceEngine --> ExtractionLLM["Extraction LLM\nGroq · Llama 3.3 70B"]
 
     Persona --> PersonaManager["PersonaManager"]
     PersonaManager --> Langfuse["Langfuse Cloud\nobservability · tracing"]
@@ -43,7 +43,7 @@ The app is available at `http://localhost:8000`. Neo4j Browser at `http://localh
 | Language | Python 3.14 | `uv` + hatchling |
 | Graph + Vector DB | Neo4j 5 Community | One DB: graph traversal + native vector index |
 | Chat LLM | Groq · Llama 3.3 70B | OpenAI-compatible SDK, swap via `CHAT_BASE_URL` |
-| Extraction LLM | OpenAI gpt-4.1-nano | Structured output (JSON schema), swap via `EXTRACTION_BASE_URL` |
+| Extraction LLM | Groq · Llama 3.3 70B | Structured output (JSON schema), swap via `EXTRACTION_BASE_URL` |
 | Embeddings | all-MiniLM-L6-v2 | Local, 384 dims, no API key |
 | API | FastAPI + SSE | Streaming tokens, async lifespan |
 | CLI | Rich + prompt-toolkit | Embeds FastAPI server in background thread |
@@ -110,7 +110,7 @@ sequenceDiagram
 
 ```mermaid
 flowchart LR
-    Msg["User message"] --> IE["InferenceEngine\ngpt-4.1-nano"]
+    Msg["User message"] --> IE["InferenceEngine\nLlama 3.3 70B"]
     IE -->|"PersonaSignals\n(aesthetics, materials,\noccasions, budget)"| PM["PersonaManager"]
     PM -->|"UNWIND batch writes\nin single transaction"| Neo4j[("Neo4j\nStylePersona node\n+ relationship edges")]
     Neo4j -->|"GET_PERSONA_ALL\n(single query)"| Snap["PersonaSnapshot\n(decay-weighted)"]

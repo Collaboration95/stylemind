@@ -21,9 +21,9 @@ def _make_inference_engine() -> PersonaInferenceEngine:
     from stylemind.config import ExtractionLLMConfig
 
     config = ExtractionLLMConfig(
-        base_url="https://api.openai.com/v1",
+        base_url="https://api.groq.com/openai/v1",
         api_key="test-key",
-        model="gpt-4.1-nano",
+        model="llama-3.3-70b-versatile",
     )
     return PersonaInferenceEngine(config)
 
