@@ -36,7 +36,7 @@ def make_product(
 
 
 @pytest.mark.unit
-def test_material_penalty_applied_when_disliked() -> None:
+def test_disliked_material_hard_filtered() -> None:
     reranker = ProductReranker()
     persona = PersonaSnapshot(
         disliked_materials=["Polyester"],
@@ -46,17 +46,13 @@ def test_material_penalty_applied_when_disliked() -> None:
     clean_product = make_product("P_CLEAN", materials=["Cotton", "Silk"], similarity_score=0.8)
 
     results = reranker.rerank([polyester_product, clean_product], persona, explain=True)
-    result_map = {r.product.product_id: r for r in results}
 
-    assert result_map["P_POLY"].breakdown is not None
-    assert result_map["P_POLY"].breakdown.persona_penalty > 0.0
-    assert result_map["P_CLEAN"].breakdown is not None
-    assert result_map["P_CLEAN"].breakdown.persona_penalty == 0.0
-    assert result_map["P_CLEAN"].final_score > result_map["P_POLY"].final_score
+    assert len(results) == 1
+    assert results[0].product.product_id == "P_CLEAN"
 
 
 @pytest.mark.unit
-def test_material_penalty_case_insensitive() -> None:
+def test_disliked_material_filter_case_insensitive() -> None:
     reranker = ProductReranker()
     persona = PersonaSnapshot(
         disliked_materials=["polyester"],
@@ -66,8 +62,7 @@ def test_material_penalty_case_insensitive() -> None:
 
     results = reranker.rerank([product], persona, explain=True)
 
-    assert results[0].breakdown is not None
-    assert results[0].breakdown.persona_penalty > 0.0
+    assert len(results) == 0
 
 
 @pytest.mark.unit

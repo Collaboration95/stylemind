@@ -141,6 +141,19 @@ class ProductReranker:
                 final_score,
             )
 
+        # Hard-filter products containing disliked materials
+        if confidence > 0.0 and persona.disliked_materials:
+            disliked_lower = {m.lower() for m in persona.disliked_materials}
+            before_count = len(results)
+            results = [
+                r
+                for r in results
+                if not ({m.lower() for m in r.product.materials} & disliked_lower)
+            ]
+            filtered = before_count - len(results)
+            if filtered:
+                logger.info("reranker filtered_disliked_materials=%d", filtered)
+
         results.sort(key=lambda r: r.final_score, reverse=True)
         logger.info("reranker reranked candidate_count=%d confidence=%.2f", len(results), confidence)
         return results

@@ -23,7 +23,7 @@ cp .env.example .env        # set CHAT_API_KEY (Groq), EXTRACTION_API_KEY (Groq)
 docker-compose up --build   # seed + embed run automatically on startup
 ```
 
-The app is available at `http://localhost:8000`. Neo4j Browser at `http://localhost:7474`.
+API docs at `http://localhost:8000/docs`. Neo4j Browser at `http://localhost:7474`.
 
 ## Tech Stack
 

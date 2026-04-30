@@ -96,7 +96,7 @@ class TestOptionalVarsUseDefaults:
         assert config.embedding.dimensions == 384
         assert config.langfuse.public_key == ""
         assert config.langfuse.secret_key == ""
-        assert config.langfuse.host == "http://localhost:3000"
+        assert config.langfuse.host == "https://us.cloud.langfuse.com"
         assert config.settings.log_level == "INFO"
         assert config.settings.vector_top_k == 10
         assert config.settings.persona_decay_rate == 0.15

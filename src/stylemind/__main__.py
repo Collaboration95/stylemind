@@ -20,7 +20,10 @@ _HEALTH_POLL_INTERVAL = 0.5
 
 def _quiet_logging() -> None:
     """Suppress server/library logs in CLI mode so only the Rich UI is visible."""
-    for name in ("stylemind", "langfuse", "neo4j", "sentence_transformers", "httpx", "httpcore"):
+    os.environ["LOG_LEVEL"] = "ERROR"
+    os.environ["TQDM_DISABLE"] = "1"
+    logging.getLogger().setLevel(logging.ERROR)
+    for name in ("stylemind", "langfuse", "neo4j", "sentence_transformers", "httpx", "httpcore", "uvicorn"):
         logging.getLogger(name).setLevel(logging.ERROR)
 
 
@@ -57,6 +60,8 @@ def main() -> None:
         if not _wait_for_server(port):
             print(f"ERROR: Server did not start within {_HEALTH_TIMEOUT}s.", file=sys.stderr)
             sys.exit(1)
+
+    _quiet_logging()
 
     user_id = uuid.uuid4().hex[:8]
     base_url = f"http://localhost:{port}"

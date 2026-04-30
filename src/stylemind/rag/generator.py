@@ -93,9 +93,10 @@ def _format_product_context(products: list[RetrievedProduct]) -> str:
     for i, product in enumerate(products, start=1):
         aesthetics = ", ".join(product.aesthetics) if product.aesthetics else "N/A"
         occasions = ", ".join(product.occasions) if product.occasions else "N/A"
+        materials = ", ".join(product.materials) if product.materials else "N/A"
         lines.append(
             f"{i}. {product.name} | Brand: {product.brand} | Price: ₹{product.price_inr:,} "
-            f"| Category: {product.category} | Aesthetics: {aesthetics} | Occasions: {occasions}"
+            f"| Category: {product.category} | Materials: {materials} | Aesthetics: {aesthetics} | Occasions: {occasions}"
         )
     return "\n".join(lines)
 
