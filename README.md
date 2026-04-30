@@ -14,30 +14,7 @@
 
 ## Architecture
 
-```mermaid
-flowchart TD
-    User([User]) --> CLI["CLI\n(Rich + prompt-toolkit)"]
-    CLI --> FastAPI["FastAPI\n/chat SSE · /persona · /health"]
-
-    FastAPI --> RAG["RAG Layer\nEmbedder → Retriever → Reranker → Generator"]
-    FastAPI --> Persona["Persona Layer\nInferenceEngine · PersonaManager"]
-    FastAPI --> Outfit["OutfitBuilder\nPAIRS_WITH traversal"]
-
-    RAG --> Neo4j[("Neo4j\ngraph + vector index")]
-    Persona --> Neo4j
-    Outfit --> Neo4j
-
-    Generator["Generator"] --> ChatLLM["Chat LLM\nGroq · Llama 3.3 70B"]
-    RAG --> Generator
-
-    Persona --> InferenceEngine["InferenceEngine"]
-    InferenceEngine --> ExtractionLLM["Extraction LLM\nGroq · Llama 3.3 70B"]
-
-    Persona --> PersonaManager["PersonaManager"]
-    PersonaManager --> Langfuse["Langfuse Cloud\nobservability · tracing"]
-
-    FastAPI -- "fire-and-forget\npersona update loop" --> Persona
-```
+![StyleMind Architecture](assets/architecture.png)
 
 ## Quick Start
 
