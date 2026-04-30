@@ -11,7 +11,7 @@ from typing import Any
 
 import httpx
 from prompt_toolkit import prompt
-from prompt_toolkit.completion import WordCompleter
+from prompt_toolkit.completion import Completer, Completion
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
@@ -59,6 +59,28 @@ def _confidence_label(score: float) -> str:
     return label
 
 
+class ProductNameCompleter(Completer):
+    """Complete product names anywhere in the input, not just at the start."""
+
+    def __init__(self, names: list[str]) -> None:
+        self._names = names
+
+    def get_completions(self, document, complete_event):
+        text = document.text_before_cursor
+        if not text:
+            return
+        text_lower = text.lower()
+        for name in self._names:
+            name_lower = name.lower()
+            for i in range(len(text)):
+                if i > 0 and text[i - 1] != " ":
+                    continue
+                tail = text_lower[i:]
+                if tail and name_lower.startswith(tail) and name_lower != tail:
+                    yield Completion(name[len(tail) :], start_position=0)
+                    break
+
+
 @dataclass
 class TurnSignals:
     turn: int
@@ -82,7 +104,7 @@ class ChatCLI:
         self._signal_log: list[TurnSignals] = []
         self._last_confidence: float = 0.0
         self._product_catalog: list[dict[str, str]] = []
-        self._completer: WordCompleter | None = None
+        self._completer: ProductNameCompleter | None = None
         self._starters: list[str] = []
 
     # ------------------------------------------------------------------
@@ -96,7 +118,7 @@ class ChatCLI:
                 if resp.status_code == 200:
                     self._product_catalog = resp.json()
                     names = [p["name"] for p in self._product_catalog]
-                    self._completer = WordCompleter(names, ignore_case=True, sentence=True)
+                    self._completer = ProductNameCompleter(names)
                     logger.debug("cli loaded %d product names for autocomplete", len(names))
         except Exception as exc:
             logger.debug("cli product catalog load failed error=%s", exc)
@@ -257,9 +279,11 @@ class ChatCLI:
         }
 
         self.console.print()
-        self.console.print("[bold green]StyleMind:[/bold green]", end=" ")
+        status = self.console.status("[dim]Thinking...[/dim]", spinner="dots")
+        status.start()
 
         full_text = ""
+        first_chunk = True
         start = time.monotonic()
         try:
             with (
@@ -269,16 +293,28 @@ class ChatCLI:
                 response.raise_for_status()
                 for chunk in self._parse_sse_stream(response):
                     if chunk.startswith("__JSON__"):
+                        if first_chunk:
+                            status.stop()
+                            first_chunk = False
                         self._handle_structured(chunk[8:])
                     else:
+                        if first_chunk:
+                            status.stop()
+                            self.console.print("[bold green]StyleMind:[/bold green]", end=" ")
+                            first_chunk = False
                         self.console.print(chunk, end="", highlight=False)
                         full_text += chunk
         except httpx.HTTPStatusError as exc:
+            status.stop()
             self.console.print(f"[red]HTTP error {exc.response.status_code}[/red]")
             return
         except httpx.RequestError as exc:
+            status.stop()
             self.console.print(f"[red]Connection error: {exc}[/red]")
             return
+
+        if first_chunk:
+            status.stop()
 
         elapsed = time.monotonic() - start
         self.console.print()
@@ -360,6 +396,7 @@ class ChatCLI:
             content_lines.append(
                 f"• [bold]{pid}[/bold]  base={base:.3f}  boost={boost:+.3f}  penalty={penalty:+.3f}  budget={budget:+.3f}  →  [cyan]{final:.3f}[/cyan]"
             )
+        self.console.print()
         panel = Panel("\n".join(content_lines), title="[bold yellow]Score Breakdown[/bold yellow]", expand=False)
         self.console.print(panel)
 
@@ -371,6 +408,7 @@ class ChatCLI:
             price = s.get("price_inr", 0)
             score = s.get("score", 0.0)
             content_lines.append(f"• [bold]{name}[/bold] by {brand} — ₹{price:,}  (score: {score:.2f})")
+        self.console.print()
         panel = Panel("\n".join(content_lines), title="[bold blue]Product Citations[/bold blue]", expand=False)
         self.console.print(panel)
 
