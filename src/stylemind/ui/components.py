@@ -105,29 +105,29 @@ html, body, [data-testid="stAppViewContainer"] {
   font-style: italic; font-family: "Fraunces", serif; }
 
 /* Top bar */
-.bq-main-bar { padding: 14px 0 12px; margin-bottom: 22px;
+.bq-main-bar { padding: 18px 0 14px; margin-bottom: 28px;
   border-bottom: 1px solid var(--rule-soft);
   display: flex; justify-content: space-between; align-items: center; }
-.bq-main-title { font-family: "Fraunces", serif; font-size: 15px; font-weight: 500; }
+.bq-main-title { font-family: "Fraunces", serif; font-size: 20px; font-weight: 500; }
 .bq-main-title em { font-style: italic; color: var(--gold); }
-.bq-main-meta { font-family: "JetBrains Mono", monospace; font-size: 10.5px;
+.bq-main-meta { font-family: "JetBrains Mono", monospace; font-size: 12px;
   color: var(--ink-faint); letter-spacing: 0.04em; text-transform: uppercase; }
 
 /* Welcome */
-.bq-welcome { padding: 32px 0 16px; }
-.bq-welcome-eyebrow { font-family: "JetBrains Mono", monospace; font-size: 10.5px;
-  color: var(--gold); letter-spacing: 0.18em; text-transform: uppercase; margin-bottom: 14px; }
-.bq-welcome-h1 { font-family: "Fraunces", serif; font-size: 42px; font-weight: 400;
-  line-height: 1.05; letter-spacing: -0.02em; margin: 0 0 12px; color: var(--ink); }
+.bq-welcome { padding: 40px 0 20px; }
+.bq-welcome-eyebrow { font-family: "JetBrains Mono", monospace; font-size: 13px;
+  color: var(--gold); letter-spacing: 0.18em; text-transform: uppercase; margin-bottom: 18px; }
+.bq-welcome-h1 { font-family: "Fraunces", serif; font-size: 54px; font-weight: 400;
+  line-height: 1.08; letter-spacing: -0.02em; margin: 0 0 16px; color: var(--ink); }
 .bq-welcome-h1 em { font-style: italic; color: var(--gold); }
-.bq-welcome-sub { font-size: 15px; color: var(--ink-soft);
-  max-width: 480px; margin: 0 0 28px; line-height: 1.55; }
+.bq-welcome-sub { font-size: 18px; color: var(--ink-soft);
+  max-width: 540px; margin: 0 0 36px; line-height: 1.55; }
 
 /* Starter buttons (Streamlit-native, restyled) */
 .stButton > button {
   background: var(--paper); border: 0.5px solid var(--rule);
-  border-radius: 12px; color: var(--ink); font: 400 14px Inter, sans-serif;
-  padding: 14px 18px; text-align: left; transition: all .15s ease;
+  border-radius: 12px; color: var(--ink); font: 400 16px Inter, sans-serif;
+  padding: 16px 20px; text-align: left; transition: all .15s ease;
 }
 .stButton > button:hover {
   border-color: var(--gold); background: oklch(0.98 0.008 75);
@@ -135,27 +135,27 @@ html, body, [data-testid="stAppViewContainer"] {
 }
 
 /* Turn marker */
-.bq-turn-marker { font-family: "JetBrains Mono", monospace; font-size: 10px;
+.bq-turn-marker { font-family: "JetBrains Mono", monospace; font-size: 11px;
   color: var(--ink-faint); letter-spacing: 0.18em; text-transform: uppercase;
-  display: flex; align-items: center; gap: 12px; margin: 20px 0 14px; }
+  display: flex; align-items: center; gap: 12px; margin: 24px 0 16px; }
 .bq-turn-marker::before, .bq-turn-marker::after {
   content: ""; height: 1px; flex: 1; background: var(--rule-soft); }
 .bq-turn-marker::before { max-width: 18px; }
 
 /* User bubble */
-.bq-msg-user { align-self: flex-end; max-width: 85%; margin: 0 0 14px auto;
+.bq-msg-user { align-self: flex-end; max-width: 85%; margin: 0 0 16px auto;
   background: var(--navy); color: oklch(0.96 0.005 75);
-  padding: 12px 18px; border-radius: 18px 18px 4px 18px;
-  font-size: 14px; line-height: 1.5; width: fit-content; }
+  padding: 14px 20px; border-radius: 18px 18px 4px 18px;
+  font-size: 16px; line-height: 1.5; width: fit-content; }
 
 /* Assistant body */
 .bq-msg-asst-byline { display: flex; align-items: center; gap: 8px;
-  font-family: "JetBrains Mono", monospace; font-size: 10px;
+  font-family: "JetBrains Mono", monospace; font-size: 11px;
   color: var(--gold); letter-spacing: 0.16em; text-transform: uppercase;
-  margin-bottom: 8px; }
+  margin-bottom: 10px; }
 .bq-msg-asst-byline::before { content: ""; width: 14px; height: 1px; background: var(--gold); }
-.bq-msg-asst-text { font-family: "Fraunces", serif; font-size: 18px;
-  line-height: 1.5; color: var(--ink); font-weight: 400; margin-bottom: 14px; }
+.bq-msg-asst-text { font-family: "Fraunces", serif; font-size: 20px;
+  line-height: 1.55; color: var(--ink); font-weight: 400; margin-bottom: 16px; }
 .bq-cursor { color: var(--gold); animation: bq-blink 1s steps(2) infinite; }
 @keyframes bq-blink { to { opacity: 0; } }
 
@@ -292,16 +292,32 @@ html, body, [data-testid="stAppViewContainer"] {
   border-radius: 24px !important;
   box-shadow: 0 2px 12px rgba(0,0,0,0.08);
   min-height: 52px;
+  overflow: hidden;
+}
+/* Force ALL inner wrappers transparent so the white shows through */
+[data-testid="stChatInput"] div {
+  background: transparent !important;
+  background-color: transparent !important;
 }
 [data-testid="stChatInput"]:focus-within {
-  border-color: #d4a73c !important;
-  box-shadow: 0 2px 12px rgba(212,167,60,0.15);
+  border-color: #dbd5c9 !important;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+}
+[data-testid="stChatInput"] *:focus {
+  outline: none !important;
+  box-shadow: none !important;
+}
+[data-testid="stChatInput"] textarea:focus {
+  outline: none !important;
+  box-shadow: none !important;
+  border: none !important;
 }
 [data-testid="stChatInput"] textarea {
   font-family: "Inter", sans-serif !important;
   color: #2a2620 !important;
   font-size: 15px !important;
   background: transparent !important;
+  background-color: transparent !important;
 }
 [data-testid="stChatInput"] textarea::placeholder {
   color: #928c84 !important;
@@ -310,6 +326,7 @@ html, body, [data-testid="stAppViewContainer"] {
 }
 [data-testid="stChatInput"] button {
   background: transparent !important;
+  background-color: transparent !important;
   color: #928c84 !important;
 }
 [data-testid="stChatInput"] button:hover {
