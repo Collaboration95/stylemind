@@ -64,7 +64,6 @@ The Streamlit app auto-starts the FastAPI backend on port 8001.
 | Slash Command | Description |
 |---------------|-------------|
 | `/persona` | Show current persona snapshot in sidebar |
-| `/explain` | Toggle score-breakdown mode for reranker |
 | `/outfit <product>` | Build outfit around a product name |
 | `/help` | Show command reference |
 | `/reset` | Clear conversation history |
@@ -84,7 +83,6 @@ uv run python -m stylemind   # or: make chat
 | `/debug-dev` | Per-turn persona signals extracted this session |
 | `/clear` | Clear conversation history |
 | `/exit` | End session (also: `/quit`, `quit`, `exit`) |
-| `1` / `2` / `3` | Use a conversation starter from the welcome screen |
 
 Product names support **tab-completion** anywhere in the input.
 
