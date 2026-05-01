@@ -156,27 +156,36 @@ MERGE (a)-[:OVERLAPS_WITH]->(b)
 # Vector indexes (384-dim, cosine; embedding column populated by embed.py)
 # ---------------------------------------------------------------------------
 
-CREATE_PRODUCT_VECTOR_INDEX = """
+
+def create_product_vector_index(dimensions: int = 384) -> str:
+    return f"""
 CREATE VECTOR INDEX product_embeddings IF NOT EXISTS
 FOR (p:Product) ON (p.embedding)
-OPTIONS {
-  indexConfig: {
-    `vector.dimensions`: 384,
+OPTIONS {{
+  indexConfig: {{
+    `vector.dimensions`: {dimensions},
     `vector.similarity_function`: 'cosine'
-  }
-}
+  }}
+}}
 """
 
-CREATE_AESTHETIC_VECTOR_INDEX = """
+
+def create_aesthetic_vector_index(dimensions: int = 384) -> str:
+    return f"""
 CREATE VECTOR INDEX aesthetic_embeddings IF NOT EXISTS
 FOR (a:Aesthetic) ON (a.embedding)
-OPTIONS {
-  indexConfig: {
-    `vector.dimensions`: 384,
+OPTIONS {{
+  indexConfig: {{
+    `vector.dimensions`: {dimensions},
     `vector.similarity_function`: 'cosine'
-  }
-}
+  }}
+}}
 """
+
+
+# Backward-compatible constants for default 384-dim model
+CREATE_PRODUCT_VECTOR_INDEX = create_product_vector_index()
+CREATE_AESTHETIC_VECTOR_INDEX = create_aesthetic_vector_index()
 
 # ---------------------------------------------------------------------------
 # Count queries (used in tests and health checks)

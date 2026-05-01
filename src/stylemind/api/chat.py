@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import json
 import logging
 import time
 from collections.abc import AsyncGenerator
 
+import orjson
 from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 
@@ -128,12 +128,12 @@ async def _sse_stream(
             }
             for p in reranked_products
         ]
-        yield f"data: __JSON__{json.dumps({'sources': sources_payload})}\n\n"
+        yield f"data: __JSON__{orjson.dumps({'sources': sources_payload}).decode()}\n\n"
 
     if chat_request.explain and rerank_results:
         explain_payload = [r.breakdown.to_dict() for r in rerank_results if r.breakdown is not None]
         if explain_payload:
-            yield f"data: __JSON__{json.dumps({'explain': explain_payload})}\n\n"
+            yield f"data: __JSON__{orjson.dumps({'explain': explain_payload}).decode()}\n\n"
 
     # 6b. Extract and emit persona signals BEFORE [DONE] so the CLI receives them
     extracted_signals = None
@@ -160,7 +160,7 @@ async def _sse_stream(
                     "signal_strength": extracted_signals.signal_strength,
                 }
             }
-            yield f"data: __JSON__{json.dumps(signals_payload)}\n\n"
+            yield f"data: __JSON__{orjson.dumps(signals_payload).decode()}\n\n"
         except Exception as exc:
             logger.warning("chat persona extraction failed user_id=%s error=%s", chat_request.user_id, exc)
 

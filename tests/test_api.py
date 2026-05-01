@@ -413,3 +413,75 @@ def test_chat_when_generator_is_none():
 
     assert response.status_code == 200
     assert "not available" in response.text.lower() or "StyleMind generator not available" in response.text
+
+
+# ---------------------------------------------------------------------------
+# API error path tests (#75)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+def test_chat_stream_error_mid_response():
+    """LLM stream raises mid-response → error event sent and stream ends with [DONE]."""
+
+    async def _failing_stream(*args, **kwargs):
+        yield "Start"
+        raise RuntimeError("LLM connection lost")
+
+    app = _make_app_with_mocks()
+    app.state.generator.stream_response = MagicMock(side_effect=_failing_stream)
+
+    client = TestClient(app, raise_server_exceptions=False)
+    response = client.post("/chat", json={"user_id": "u1", "message": "hello"})
+
+    assert response.status_code == 200
+    payloads = _parse_sse_data(response)
+    assert payloads[-1] == "[DONE]"
+    assert any("error" in p.lower() for p in payloads)
+
+
+@pytest.mark.unit
+def test_chat_retriever_failure_still_responds():
+    """Retriever throws → chat still returns a response and ends with [DONE]."""
+    app = _make_app_with_mocks(stream_chunks=["Fallback response"])
+    app.state.retriever.retrieve = MagicMock(side_effect=RuntimeError("Neo4j unavailable"))
+
+    client = TestClient(app, raise_server_exceptions=False)
+    response = client.post("/chat", json={"user_id": "u1", "message": "what to wear?"})
+
+    assert response.status_code == 200
+    payloads = _parse_sse_data(response)
+    assert payloads[-1] == "[DONE]"
+    assert any("Fallback response" in p for p in payloads)
+
+
+@pytest.mark.unit
+def test_chat_persona_inference_failure_still_responds():
+    """Persona inference failure → chat still succeeds, no persona signals emitted."""
+    app = _make_app_with_mocks(stream_chunks=["Hello"])
+    app.state.inference_engine.extract_signals = MagicMock(side_effect=RuntimeError("Extraction failed"))
+
+    client = TestClient(app, raise_server_exceptions=False)
+    response = client.post("/chat", json={"user_id": "u1", "message": "show me dresses"})
+
+    assert response.status_code == 200
+    payloads = _parse_sse_data(response)
+    assert payloads[-1] == "[DONE]"
+    signals_events = [p for p in payloads if "__JSON__" in p and "signals" in p]
+    assert len(signals_events) == 0
+
+
+@pytest.mark.unit
+def test_chat_empty_retrieval_still_streams():
+    """Retriever returns empty results → response still streams and completes."""
+    app = _make_app_with_mocks(stream_chunks=["No products found, but here's advice"])
+    app.state.retriever.retrieve = MagicMock(return_value=[])
+
+    client = TestClient(app, raise_server_exceptions=False)
+    response = client.post("/chat", json={"user_id": "u1", "message": "hello"})
+
+    assert response.status_code == 200
+    payloads = _parse_sse_data(response)
+    assert payloads[-1] == "[DONE]"
+    sources_events = [p for p in payloads if "__JSON__" in p and "sources" in p]
+    assert len(sources_events) == 0

@@ -4,7 +4,7 @@
 
 # ── Quality Gate ────────────────────────────────────────────────────────────────
 
-qgate: lint-check format-check type-check audit
+qgate: lint-check format-check type-check audit test-unit
 
 lint-check:
 	uv run ruff check src/ tests/ scripts/
@@ -93,7 +93,8 @@ setup: pre-commit-install
 	@echo "  1. Edit .env with your API keys (CHAT_API_KEY, EXTRACTION_API_KEY)"
 	@echo "  2. make db-up              # start Neo4j"
 	@echo "  3. make seed-and-embed     # load data + embeddings"
-	@echo "  4. make chat               # start chatting"
+	@echo "  4. make web-chat           # launch web UI at http://localhost:8000"
+	@echo "     make chat               # or: terminal CLI alternative"
 
 pre-commit-install:
 	uv run pre-commit install

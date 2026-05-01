@@ -1,16 +1,8 @@
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
 import pytest
-
-# Ensure scripts/ and project root are importable during tests.
-_ROOT = Path(__file__).parent.parent
-sys.path.insert(0, str(_ROOT / "src"))
-sys.path.insert(0, str(_ROOT))
-sys.path.insert(0, str(_ROOT / "scripts"))
-
 
 # ---------------------------------------------------------------------------
 # Unit tests — no Neo4j required

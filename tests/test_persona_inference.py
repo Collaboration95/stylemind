@@ -227,3 +227,60 @@ def test_shown_products_included_in_context() -> None:
     user_msg = next((m["content"] for m in messages if m["role"] == "user"), "")
     assert "P001" in user_msg
     assert "P002" in user_msg
+
+
+# ---------------------------------------------------------------------------
+# json_schema capability caching (#68)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+def test_json_schema_fallback_extracts_correct_signals() -> None:
+    """Fallback to json_object still extracts signals correctly (#73)."""
+    engine = _make_engine()
+    expected_data = _full_signals(
+        liked_aesthetics=["Quiet Luxury"],
+        budget_signal="premium",
+        signal_strength=0.8,
+    )
+    response = _mock_response(expected_data)
+
+    call_count = 0
+
+    def side_effect(**kwargs):
+        nonlocal call_count
+        call_count += 1
+        rf = kwargs.get("response_format", {})
+        if rf.get("type") == "json_schema":
+            raise RuntimeError("json_schema not supported")
+        return response
+
+    with patch.object(engine._client.chat.completions, "create", side_effect=side_effect):
+        signals = engine.extract_signals("I like understated luxury", [], [])
+        assert call_count == 2  # json_schema attempt + json_object fallback
+        assert engine._supports_json_schema is False
+        assert signals.liked_aesthetics == ["Quiet Luxury"]
+        assert signals.budget_signal == "premium"
+        assert signals.signal_strength == pytest.approx(0.8)
+
+        call_count = 0
+        signals2 = engine.extract_signals("second call", [], [])
+        assert call_count == 1  # only json_object, no wasted attempt
+        assert signals2.liked_aesthetics == ["Quiet Luxury"]
+
+
+@pytest.mark.unit
+def test_json_schema_success_caches_support() -> None:
+    """When json_schema succeeds, the flag is set to True and reused."""
+    engine = _make_engine()
+    response = _mock_response(_full_signals(signal_strength=0.5))
+
+    with patch.object(engine._client.chat.completions, "create", return_value=response) as mock_create:
+        engine.extract_signals("first call", [], [])
+        assert engine._supports_json_schema is True
+
+        engine.extract_signals("second call", [], [])
+        # Both calls should use json_schema format
+        for call in mock_create.call_args_list:
+            rf = call[1].get("response_format", {})
+            assert rf.get("type") == "json_schema"

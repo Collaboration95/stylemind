@@ -186,15 +186,18 @@ class PersonaManager:
         decayed_occasions.sort(key=lambda x: x[1], reverse=True)
         top_occasions = [name for name, _ in decayed_occasions[:3]]
 
-        # Budget tier: weighted accumulation
+        # Budget tier: weighted accumulation (entries stored as "signal:weight" strings)
         budget_weights: dict[str, float] = {}
         for entry in budget_signals:
-            if isinstance(entry, dict):
-                sig = entry.get("signal", "")
-                w = float(entry.get("weight", 1.0))
+            entry_str = str(entry)
+            if ":" in entry_str:
+                sig, w_str = entry_str.rsplit(":", 1)
+                try:
+                    w = float(w_str)
+                except ValueError:
+                    sig, w = entry_str, 1.0
             else:
-                sig = str(entry)
-                w = 1.0
+                sig, w = entry_str, 1.0
             budget_weights[sig] = budget_weights.get(sig, 0.0) + w
         budget_tier: str | None = max(budget_weights, key=lambda k: budget_weights[k]) if budget_weights else None
 
@@ -290,13 +293,13 @@ class PersonaManager:
                         },
                     )
 
-                # Budget signal — stored as plain string; Neo4j can't store Map in property arrays
+                # Budget signal — encoded as "signal:weight" string; Neo4j can't store Maps in property arrays
                 if signals.budget_signal:
                     tx.run(
                         SET_BUDGET_SIGNAL,
                         {
                             "user_id": user_id,
-                            "budget_entry": signals.budget_signal,
+                            "budget_entry": f"{signals.budget_signal}:{weight:.2f}",
                         },
                     )
 

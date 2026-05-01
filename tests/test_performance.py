@@ -90,7 +90,7 @@ def test_embedding_latency_under_500ms() -> None:
 @pytest.mark.performance
 def test_reranker_latency_under_200ms() -> None:
     """ProductReranker.rerank with 10 products and a persona must complete in < 200ms."""
-    reranker = ProductReranker(persona_weight=0.3)
+    reranker = ProductReranker()
     products = _make_10_products()
     persona = _make_persona_snapshot()
 

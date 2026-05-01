@@ -20,10 +20,11 @@
 
 ```bash
 cp .env.example .env        # set CHAT_API_KEY (Groq), EXTRACTION_API_KEY (Groq), NEO4J_PASSWORD
-docker-compose up --build   # seed + embed run automatically on startup
+make db-up && make seed-and-embed   # start Neo4j, seed graph, build embeddings
+make web-chat                       # launch the web UI at http://localhost:8000
 ```
 
-API docs at `http://localhost:8000/docs`. Neo4j Browser at `http://localhost:7474`.
+Web UI at `http://localhost:8000`. API docs at `http://localhost:8001/docs`. Neo4j Browser at `http://localhost:7474`.
 
 ## Tech Stack
 
@@ -34,8 +35,9 @@ API docs at `http://localhost:8000/docs`. Neo4j Browser at `http://localhost:747
 | Chat LLM | Groq · Llama 3.3 70B | OpenAI-compatible SDK, swap via `CHAT_BASE_URL` |
 | Extraction LLM | Groq · Llama 3.3 70B | Structured output (JSON schema), swap via `EXTRACTION_BASE_URL` |
 | Embeddings | all-MiniLM-L6-v2 | Local, 384 dims, no API key |
-| API | FastAPI + SSE | Streaming tokens, async lifespan |
-| CLI | Rich + prompt-toolkit | Embeds FastAPI server in background thread |
+| API | FastAPI + SSE | Streaming tokens, async lifespan (port 8001) |
+| Web UI | Streamlit | Browser-based boutique chat, auto-starts API, slash commands (port 8000) |
+| CLI | Rich + prompt-toolkit | Terminal chat, embeds FastAPI in background thread |
 | Observability | Langfuse Cloud | `@observe` spans across full pipeline, token usage, persona confidence scores |
 | Packaging | Docker (two-stage, non-root) | `docker-compose up --build` starts everything |
 
@@ -49,10 +51,29 @@ API docs at `http://localhost:8000/docs`. Neo4j Browser at `http://localhost:747
 | `GET` | `/products/names` | Product catalog for autocomplete |
 | `GET` | `/health` | Liveness check (Neo4j + embedder) |
 
-## CLI
+## Chat Interfaces
+
+### Web UI (default)
 
 ```bash
-uv run python -m stylemind
+make web-chat   # opens http://localhost:8000
+```
+
+The Streamlit app auto-starts the FastAPI backend on port 8001.
+
+| Slash Command | Description |
+|---------------|-------------|
+| `/persona` | Show current persona snapshot in sidebar |
+| `/explain` | Toggle score-breakdown mode for reranker |
+| `/outfit <product>` | Build outfit around a product name |
+| `/help` | Show command reference |
+| `/reset` | Clear conversation history |
+| `/debug` | Toggle raw signal debug output |
+
+### Terminal CLI
+
+```bash
+uv run python -m stylemind   # or: make chat
 ```
 
 | Command | Action |

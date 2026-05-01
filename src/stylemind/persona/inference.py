@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import json
 import logging
 
+import orjson
 from openai import OpenAI
 
 from stylemind.config import ExtractionLLMConfig
@@ -66,6 +66,7 @@ class PersonaInferenceEngine:
     def __init__(self, config: ExtractionLLMConfig) -> None:
         self._client = OpenAI(base_url=config.base_url, api_key=config.api_key)
         self._model = config.model
+        self._supports_json_schema: bool | None = None
 
     @observe(name="extract_signals")
     def extract_signals(
@@ -104,36 +105,46 @@ class PersonaInferenceEngine:
             else:
                 user_content = message
 
-            try:
+            messages = [
+                {"role": "system", "content": EXTRACTION_SYSTEM_PROMPT},
+                {"role": "user", "content": user_content},
+            ]
+
+            if self._supports_json_schema is False:
                 response = self._client.chat.completions.create(
                     model=self._model,
-                    messages=[
-                        {"role": "system", "content": EXTRACTION_SYSTEM_PROMPT},
-                        {"role": "user", "content": user_content},
-                    ],
-                    response_format={
-                        "type": "json_schema",
-                        "json_schema": {
-                            "name": "PersonaSignals",
-                            "schema": _PERSONA_JSON_SCHEMA,
-                            "strict": True,
-                        },
-                    },
-                    temperature=0,
-                )
-            except Exception:
-                response = self._client.chat.completions.create(
-                    model=self._model,
-                    messages=[
-                        {"role": "system", "content": EXTRACTION_SYSTEM_PROMPT},
-                        {"role": "user", "content": user_content},
-                    ],
+                    messages=messages,
                     response_format={"type": "json_object"},
                     temperature=0,
                 )
+            else:
+                try:
+                    response = self._client.chat.completions.create(
+                        model=self._model,
+                        messages=messages,
+                        response_format={
+                            "type": "json_schema",
+                            "json_schema": {
+                                "name": "PersonaSignals",
+                                "schema": _PERSONA_JSON_SCHEMA,
+                                "strict": True,
+                            },
+                        },
+                        temperature=0,
+                    )
+                    self._supports_json_schema = True
+                except Exception:
+                    logger.info("json_schema not supported by provider, falling back to json_object")
+                    self._supports_json_schema = False
+                    response = self._client.chat.completions.create(
+                        model=self._model,
+                        messages=messages,
+                        response_format={"type": "json_object"},
+                        temperature=0,
+                    )
 
             raw_content = response.choices[0].message.content or "{}"
-            data = json.loads(raw_content)
+            data = orjson.loads(raw_content)
             signals = PersonaSignals(**data)
 
             if hasattr(response, "usage") and response.usage is not None:

@@ -61,8 +61,6 @@ def main() -> None:
             print(f"ERROR: Server did not start within {_HEALTH_TIMEOUT}s.", file=sys.stderr)
             sys.exit(1)
 
-    _quiet_logging()
-
     user_id = uuid.uuid4().hex[:8]
     base_url = f"http://localhost:{port}"
 
