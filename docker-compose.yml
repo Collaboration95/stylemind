@@ -31,7 +31,7 @@ services:
     build: .
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "8001:8001"
     env_file: .env
     environment:
       NEO4J_URI: bolt://neo4j:7687
@@ -44,10 +44,10 @@ services:
       sh -c "
         python scripts/seed.py &&
         python scripts/embed.py &&
-        python -m uvicorn stylemind.main:app --host 0.0.0.0 --port 8000
+        python -m uvicorn stylemind.main:app --host 0.0.0.0 --port 8001
       "
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
