@@ -1,5 +1,5 @@
 .PHONY: qgate lint format type-check test test-unit test-integration test-e2e \
-       audit chat seed embed seed-and-embed setup dev health \
+       audit chat web-chat seed embed seed-and-embed setup dev health \
        db-up db-down up down clean pre-commit-install
 
 # ── Quality Gate ────────────────────────────────────────────────────────────────
@@ -56,11 +56,14 @@ seed-and-embed: seed embed
 chat:
 	uv run python -m stylemind
 
+web-chat:
+	uv run streamlit run src/stylemind/ui/app.py --server.port 8000 --server.headless true --server.fileWatcherType none
+
 dev:
-	uv run uvicorn stylemind.main:app --reload --host 127.0.0.1 --port 8000
+	uv run uvicorn stylemind.main:app --reload --host 127.0.0.1 --port 8001
 
 health:
-	@curl -sf http://localhost:8000/health && echo " OK" || echo " FAIL (is the server running?)"
+	@curl -sf http://localhost:8001/health && echo " OK" || echo " FAIL (is the server running?)"
 
 # ── Docker ──────────────────────────────────────────────────────────────────────
 
@@ -75,7 +78,7 @@ db-down:
 
 up:
 	BUILDX_BUILDER=desktop-linux docker compose up --build -d
-	@echo "App: http://localhost:8000  Neo4j: http://localhost:7474  Langfuse: https://us.cloud.langfuse.com (cloud)"
+	@echo "API: http://localhost:8001  Neo4j: http://localhost:7474  Web UI: make web-chat (localhost:8000)"
 
 down:
 	docker compose down

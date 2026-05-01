@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 
 from stylemind.cli.chat import ChatCLI
 
-_DEFAULT_PORT = 8000
+_DEFAULT_PORT = 8001
 _HEALTH_TIMEOUT = 30
 _HEALTH_POLL_INTERVAL = 0.5
 
