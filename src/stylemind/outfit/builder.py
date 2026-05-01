@@ -91,27 +91,10 @@ LIMIT 10
 # Builder
 # ---------------------------------------------------------------------------
 
-MIN_OUTFIT_ITEMS = 2  # paired items (anchor + 2-4 = 3-5 total)
 MAX_OUTFIT_ITEMS = 4
 
 
 class OutfitBuilder:
-    CATEGORY_SLOTS = [
-        "Top",
-        "Tops",
-        "Bottom",
-        "Bottoms",
-        "Footwear",
-        "Bag",
-        "Bags",
-        "Accessory",
-        "Accessories",
-        "Outerwear",
-        "Dress",
-        "Dresses",
-        "Jumpsuit",
-    ]
-
     def __init__(self, driver: Driver) -> None:
         self._driver = driver
 

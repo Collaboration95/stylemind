@@ -579,7 +579,7 @@ def render_explain_table(rows: list[dict[str, Any]]) -> None:
     for r in rows:
         body.append(
             '<div class="bq-explain-row">'
-            f'<span>{r.get("product_id", "")}</span><span></span>'
+            f"<span>{r.get('product_id', '')}</span><span></span>"
             f'<span class="num">{r.get("base_score", 0):.2f}</span>'
             f'<span class="num">+{r.get("persona_boost", 0):.2f}</span>'
             f'<span class="num">−{r.get("penalty", 0):.2f}</span>'
@@ -594,7 +594,7 @@ def render_explain_table(rows: list[dict[str, Any]]) -> None:
         "<span>persona-aware</span>"
         "</div>"
         '<div class="bq-explain-row head">'
-        '<span>id</span><span></span>'
+        "<span>id</span><span></span>"
         '<span class="num">base</span><span class="num">+pers</span>'
         '<span class="num">−pen</span><span class="num">+budg</span>'
         '<span class="num">final</span>'
@@ -702,10 +702,7 @@ def render_help_panel() -> None:
         for name, desc in commands
     )
     st.markdown(
-        '<div class="bq-cmd-panel">'
-        '<div class="bq-cmd-title">Available Commands</div>'
-        f"{rows}"
-        "</div>",
+        f'<div class="bq-cmd-panel"><div class="bq-cmd-title">Available Commands</div>{rows}</div>',
         unsafe_allow_html=True,
     )
 
@@ -752,10 +749,7 @@ def render_persona_panel(persona: dict[str, Any]) -> None:
         "</div>"
     )
     st.markdown(
-        '<div class="bq-cmd-panel">'
-        '<div class="bq-cmd-title">Your Style Persona</div>'
-        f"{rows}"
-        "</div>",
+        f'<div class="bq-cmd-panel"><div class="bq-cmd-title">Your Style Persona</div>{rows}</div>',
         unsafe_allow_html=True,
     )
 
@@ -778,7 +772,7 @@ def render_debug_signals(signals_log: list[dict[str, Any]]) -> None:
         occasions = ", ".join(s.get("mentioned_occasions", [])) or "—"
         colors = ", ".join(s.get("color_preferences", [])) or "—"
         brands = ", ".join(s.get("brand_mentions", [])) or "—"
-        strength = f'{s.get("signal_strength", 0):.2f}'
+        strength = f"{s.get('signal_strength', 0):.2f}"
         rows.append(
             f"<tr><td>{turn}</td><td>{aesthetics}</td><td>{materials}</td>"
             f"<td>{budget}</td><td>{occasions}</td><td>{colors}</td>"

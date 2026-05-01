@@ -25,7 +25,9 @@ ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONPATH="/app/src"
 ENV HF_HOME="/app/.cache/huggingface"
 
-RUN mkdir -p /app/.cache && chown -R appuser:appuser /app
+RUN mkdir -p /app/.cache && \
+    HF_HOME=/app/.cache/huggingface python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')" && \
+    chown -R appuser:appuser /app
 
 USER appuser
 

@@ -363,8 +363,7 @@ def test_persona_5_turn_evolution():
     # ---- execute_query interceptor (get_persona single read) ----
     def execute_query_side_effect(query: str, params: dict, database_: str = "neo4j") -> MagicMock:
         prefs = [
-            {"aesthetic": n, "weight": v["weight"], "last_seen": v["last_seen"]}
-            for n, v in stored_aesthetics.items()
+            {"aesthetic": n, "weight": v["weight"], "last_seen": v["last_seen"]} for n, v in stored_aesthetics.items()
         ]
         rec = MagicMock()
         rec.data.return_value = {

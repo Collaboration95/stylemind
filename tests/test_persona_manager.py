@@ -125,10 +125,10 @@ def test_budget_accumulation() -> None:
     data = _make_full_record(
         turn_count=4,
         budget_signals=[
-            {"signal": "premium", "weight": 0.8},
-            {"signal": "premium", "weight": 0.6},
-            {"signal": "luxury", "weight": 0.9},
-            {"signal": "premium", "weight": 0.7},
+            "premium:0.80",
+            "premium:0.60",
+            "luxury:0.90",
+            "premium:0.70",
         ],
     )
     snapshot = _make_manager(_make_driver_with_records([data])).get_persona("user_budget")
@@ -141,9 +141,9 @@ def test_weighted_budget_outranks_count() -> None:
     data = _make_full_record(
         turn_count=3,
         budget_signals=[
-            {"signal": "budget", "weight": 0.3},
-            {"signal": "budget", "weight": 0.3},
-            {"signal": "luxury", "weight": 0.9},
+            "budget:0.30",
+            "budget:0.30",
+            "luxury:0.90",
         ],
     )
     snapshot = _make_manager(_make_driver_with_records([data])).get_persona("user_weighted")
@@ -248,7 +248,9 @@ def test_occasion_decay_ordering() -> None:
 def test_update_persona_uses_session_transaction() -> None:
     """update_persona opens a session and begins a transaction (atomic writes)."""
     driver = _make_update_driver(turn_count=1)
-    _make_manager(driver).update_persona("user_001", PersonaSignals(liked_aesthetics=["Quiet Luxury"], signal_strength=0.8))
+    _make_manager(driver).update_persona(
+        "user_001", PersonaSignals(liked_aesthetics=["Quiet Luxury"], signal_strength=0.8)
+    )
 
     driver.session.assert_called_once_with(database="neo4j")
     mock_session = driver.session.return_value.__enter__.return_value
@@ -325,7 +327,7 @@ def test_update_persona_negative_sentiment_writes_disliked_product() -> None:
 
 @pytest.mark.unit
 def test_update_persona_budget_signal_stored() -> None:
-    """budget_signal triggers the SET_BUDGET_SIGNAL tx.run call."""
+    """budget_signal triggers the SET_BUDGET_SIGNAL tx.run call with encoded format."""
     driver = _make_update_driver(turn_count=1)
     _make_manager(driver).update_persona("user_luxury", PersonaSignals(budget_signal="luxury", signal_strength=0.7))
 
@@ -334,6 +336,58 @@ def test_update_persona_budget_signal_stored() -> None:
 
     budget_calls = [c for c in mock_tx.run.call_args_list if "budget_entry" in str(c)]
     assert len(budget_calls) == 1
+    params = budget_calls[0][0][1]
+    assert params["budget_entry"] == "luxury:0.70"
+
+
+@pytest.mark.unit
+def test_budget_signal_write_read_round_trip() -> None:
+    """Budget signal written by update_persona can be correctly parsed by get_persona (#69, #74)."""
+    write_driver = _make_update_driver(turn_count=1)
+    manager = _make_manager(write_driver)
+    manager.update_persona("user_rt", PersonaSignals(budget_signal="premium", signal_strength=0.85))
+
+    mock_session = write_driver.session.return_value.__enter__.return_value
+    mock_tx = mock_session.begin_transaction.return_value.__enter__.return_value
+    budget_calls = [c for c in mock_tx.run.call_args_list if "budget_entry" in str(c)]
+    written_entry = budget_calls[0][0][1]["budget_entry"]
+
+    read_driver = _make_driver_with_records(
+        [
+            _make_full_record(
+                turn_count=1,
+                budget_signals=[written_entry],
+            )
+        ]
+    )
+    snapshot = _make_manager(read_driver).get_persona("user_rt")
+    assert snapshot.budget_tier == "premium"
+
+
+@pytest.mark.unit
+def test_budget_signal_round_trip_preserves_weight_ranking() -> None:
+    """Two budget signals written with different weights → higher total weight wins on read."""
+    write_driver = _make_update_driver(turn_count=1)
+    manager = _make_manager(write_driver)
+
+    manager.update_persona("user_w", PersonaSignals(budget_signal="mid", signal_strength=0.3))
+    manager.update_persona("user_w", PersonaSignals(budget_signal="luxury", signal_strength=0.95))
+
+    mock_session = write_driver.session.return_value.__enter__.return_value
+    mock_tx = mock_session.begin_transaction.return_value.__enter__.return_value
+    budget_calls = [c for c in mock_tx.run.call_args_list if "budget_entry" in str(c)]
+    written_entries = [c[0][1]["budget_entry"] for c in budget_calls]
+
+    read_driver = _make_driver_with_records(
+        [
+            _make_full_record(
+                turn_count=2,
+                budget_signals=written_entries,
+            )
+        ]
+    )
+    snapshot = _make_manager(read_driver).get_persona("user_w")
+    assert snapshot.budget_tier == "luxury"
 
 
 @pytest.mark.unit
@@ -420,6 +474,7 @@ def test_retry_retries_on_transient_failure() -> None:
 @pytest.mark.unit
 def test_retry_raises_after_exhaustion() -> None:
     """_retry re-raises the last exception when all attempts fail."""
+
     def fn() -> None:
         raise ValueError("permanent error")
 

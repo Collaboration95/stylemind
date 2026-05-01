@@ -67,8 +67,14 @@ def _quiet_logging() -> None:
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
     logging.getLogger().setLevel(logging.ERROR)
     for name in (
-        "stylemind", "langfuse", "neo4j", "sentence_transformers",
-        "httpx", "httpcore", "uvicorn", "transformers",
+        "stylemind",
+        "langfuse",
+        "neo4j",
+        "sentence_transformers",
+        "httpx",
+        "httpcore",
+        "uvicorn",
+        "transformers",
     ):
         logging.getLogger(name).setLevel(logging.ERROR)
 
@@ -271,7 +277,10 @@ def _handle_slash_command(cmd: str) -> bool:
         if not product_id:
             catalog = st.session_state.product_catalog
             close = get_close_matches(
-                query.lower(), [p["name"].lower() for p in catalog], n=3, cutoff=0.4,
+                query.lower(),
+                [p["name"].lower() for p in catalog],
+                n=3,
+                cutoff=0.4,
             )
             suggestions = ""
             if close:

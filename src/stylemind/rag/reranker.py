@@ -63,9 +63,6 @@ class ProductReranker:
     ranking is identical to pure vector similarity ordering.
     """
 
-    def __init__(self, persona_weight: float = 0.3) -> None:
-        self._persona_weight = persona_weight
-
     @observe(name="rerank")
     def rerank(
         self,
@@ -84,6 +81,16 @@ class ProductReranker:
             list[RerankResult] sorted by final_score descending.
         """
         confidence = persona.confidence_score
+
+        # Hard-filter disliked materials before scoring to avoid wasted computation
+        if confidence > 0.0 and persona.disliked_materials:
+            disliked_lower = {m.lower() for m in persona.disliked_materials}
+            before_count = len(candidates)
+            candidates = [c for c in candidates if not ({m.lower() for m in c.materials} & disliked_lower)]
+            filtered = before_count - len(candidates)
+            if filtered:
+                logger.info("reranker filtered_disliked_materials=%d", filtered)
+
         results: list[RerankResult] = []
 
         for candidate in candidates:
@@ -96,15 +103,10 @@ class ProductReranker:
                 raw_boost = len(matched) * _PERSONA_BOOST_PER_AESTHETIC * confidence
                 persona_boost = min(raw_boost, _PERSONA_BOOST_CAP)
 
-            # --- persona penalty ---
+            # --- persona penalty (disliked products only; materials already filtered) ---
             persona_penalty = 0.0
-            if confidence > 0.0:
-                disliked_lower = {m.lower() for m in persona.disliked_materials}
-                candidate_materials_lower = {m.lower() for m in candidate.materials}
-                if candidate_materials_lower & disliked_lower:
-                    persona_penalty += _PERSONA_PENALTY * confidence
-                if persona.disliked_products and candidate.product_id in persona.disliked_products:
-                    persona_penalty += _PERSONA_PENALTY * confidence
+            if confidence > 0.0 and persona.disliked_products and candidate.product_id in persona.disliked_products:
+                persona_penalty = _PERSONA_PENALTY * confidence
 
             # --- budget boost ---
             budget_boost = 0.0
@@ -140,19 +142,6 @@ class ProductReranker:
                 budget_boost,
                 final_score,
             )
-
-        # Hard-filter products containing disliked materials
-        if confidence > 0.0 and persona.disliked_materials:
-            disliked_lower = {m.lower() for m in persona.disliked_materials}
-            before_count = len(results)
-            results = [
-                r
-                for r in results
-                if not ({m.lower() for m in r.product.materials} & disliked_lower)
-            ]
-            filtered = before_count - len(results)
-            if filtered:
-                logger.info("reranker filtered_disliked_materials=%d", filtered)
 
         results.sort(key=lambda r: r.final_score, reverse=True)
         logger.info("reranker reranked candidate_count=%d confidence=%.2f", len(results), confidence)
