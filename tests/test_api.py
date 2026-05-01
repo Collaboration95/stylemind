@@ -220,7 +220,7 @@ def test_persona_endpoint_returns_default_when_no_data():
 
 
 # ---------------------------------------------------------------------------
-# SSE __JSON__ events
+# SSE structured events (event: json)
 # ---------------------------------------------------------------------------
 
 
@@ -279,11 +279,32 @@ def _make_rerank_results(products, explain=False):
 
 
 def _parse_sse_data(response):
+    """Return all data: payloads (text chunks + [DONE] marker)."""
     payloads = []
     for line in response.text.splitlines():
         if line.startswith("data: "):
             payloads.append(line[6:])
     return payloads
+
+
+def _parse_sse_json_events(response):
+    """Return parsed JSON objects from 'event: json' SSE events."""
+    import json
+
+    events = []
+    event_type = None
+    for line in response.text.splitlines():
+        if line.startswith("event: "):
+            event_type = line[7:].strip()
+        elif line.startswith("data: ") and event_type == "json":
+            try:
+                events.append(json.loads(line[6:]))
+            except json.JSONDecodeError:
+                pass
+            event_type = None
+        elif not line:
+            event_type = None
+    return events
 
 
 @pytest.mark.integration
@@ -303,14 +324,12 @@ def test_chat_emits_sources_json_event():
     response = client.post("/chat", json={"user_id": "u1", "message": "test"})
 
     assert response.status_code == 200
-    payloads = _parse_sse_data(response)
+    json_events = _parse_sse_json_events(response)
 
-    sources_events = [p for p in payloads if p.startswith("__JSON__") and '"sources"' in p]
+    sources_events = [e for e in json_events if "sources" in e]
     assert len(sources_events) == 1
 
-    import json
-
-    data = json.loads(sources_events[0][8:])
+    data = sources_events[0]
     assert len(data["sources"]) == 2
     assert data["sources"][0]["product_id"] == "P001"
     assert data["sources"][0]["name"] == "Linen Trouser"
@@ -335,14 +354,12 @@ def test_chat_emits_explain_json_event_when_explain_true():
     response = client.post("/chat", json={"user_id": "u1", "message": "test", "explain": True})
 
     assert response.status_code == 200
-    payloads = _parse_sse_data(response)
+    json_events = _parse_sse_json_events(response)
 
-    import json
-
-    explain_events = [p for p in payloads if p.startswith("__JSON__") and '"explain"' in p]
+    explain_events = [e for e in json_events if "explain" in e]
     assert len(explain_events) == 1
 
-    data = json.loads(explain_events[0][8:])
+    data = explain_events[0]
     assert len(data["explain"]) == 2
     assert data["explain"][0]["product_id"] == "P001"
     assert data["explain"][0]["base_score"] == pytest.approx(0.85)
@@ -368,9 +385,9 @@ def test_chat_no_explain_event_when_explain_false():
     response = client.post("/chat", json={"user_id": "u1", "message": "test", "explain": False})
 
     assert response.status_code == 200
-    payloads = _parse_sse_data(response)
+    json_events = _parse_sse_json_events(response)
 
-    explain_events = [p for p in payloads if p.startswith("__JSON__") and '"explain"' in p]
+    explain_events = [e for e in json_events if "explain" in e]
     assert len(explain_events) == 0
 
 
@@ -467,7 +484,8 @@ def test_chat_persona_inference_failure_still_responds():
     assert response.status_code == 200
     payloads = _parse_sse_data(response)
     assert payloads[-1] == "[DONE]"
-    signals_events = [p for p in payloads if "__JSON__" in p and "signals" in p]
+    json_events = _parse_sse_json_events(response)
+    signals_events = [e for e in json_events if "signals" in e]
     assert len(signals_events) == 0
 
 
@@ -483,5 +501,6 @@ def test_chat_empty_retrieval_still_streams():
     assert response.status_code == 200
     payloads = _parse_sse_data(response)
     assert payloads[-1] == "[DONE]"
-    sources_events = [p for p in payloads if "__JSON__" in p and "sources" in p]
+    json_events = _parse_sse_json_events(response)
+    sources_events = [e for e in json_events if "sources" in e]
     assert len(sources_events) == 0

@@ -238,7 +238,7 @@ YIELD node AS a, score AS aesthetic_score
 WITH a, aesthetic_score
 WHERE aesthetic_score >= $min_threshold
 ORDER BY aesthetic_score DESC
-LIMIT 3
+LIMIT $top_k_aesthetics
 MATCH (p:Product)-[:EMBODIES]->(a)
 MATCH (p)-[:BELONGS_TO]->(b:Brand)
 OPTIONAL MATCH (p)-[:EMBODIES]->(a2:Aesthetic)

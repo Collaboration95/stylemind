@@ -292,18 +292,12 @@ class ChatCLI:
             ):
                 response.raise_for_status()
                 for chunk in self._parse_sse_stream(response):
-                    if chunk.startswith("__JSON__"):
-                        if first_chunk:
-                            status.stop()
-                            first_chunk = False
-                        self._handle_structured(chunk[8:])
-                    else:
-                        if first_chunk:
-                            status.stop()
-                            self.console.print("[bold green]StyleMind:[/bold green]", end=" ")
-                            first_chunk = False
-                        self.console.print(chunk, end="", highlight=False)
-                        full_text += chunk
+                    if first_chunk:
+                        status.stop()
+                        self.console.print("[bold green]StyleMind:[/bold green]", end=" ")
+                        first_chunk = False
+                    self.console.print(chunk, end="", highlight=False)
+                    full_text += chunk
         except httpx.HTTPStatusError as exc:
             status.stop()
             self.console.print(f"[red]HTTP error {exc.response.status_code}[/red]")
@@ -328,7 +322,7 @@ class ChatCLI:
 
     def _update_confidence(self) -> None:
         try:
-            with httpx.Client(timeout=5.0) as client:
+            with httpx.Client(timeout=1.0) as client:
                 resp = client.get(f"{self.base_url}/persona/{self.user_id}")
                 if resp.status_code == 200:
                     self._last_confidence = resp.json().get("confidence_score", 0.0)
@@ -336,15 +330,29 @@ class ChatCLI:
             pass
 
     def _parse_sse_stream(self, response: httpx.Response) -> Generator[str]:
+        """Yield text chunks; handle structured 'event: json' events inline.
+
+        SSE event type field distinguishes structured payloads from LLM text,
+        eliminating any risk of collision with LLM-generated content.
+        """
+        event_type: str | None = None
         for line in response.iter_lines():
             line = line.strip()
             if not line:
+                event_type = None
+                continue
+            if line.startswith("event: "):
+                event_type = line[7:].strip()
                 continue
             if line.startswith("data: "):
                 data = line[6:]
                 if data == "[DONE]":
-                    break
-                yield data
+                    return
+                if event_type == "json":
+                    self._handle_structured(data)
+                    event_type = None
+                else:
+                    yield data
 
     # ------------------------------------------------------------------
     # Structured payload handling (products / outfit / signals)

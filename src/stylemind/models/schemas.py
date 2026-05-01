@@ -1,6 +1,17 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
+
+
+class HistoryMessage(BaseModel):
+    """A single turn in the conversation history."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    role: Literal["user", "assistant", "system"]
+    content: str = Field(max_length=10000)
 
 
 class ChatRequest(BaseModel):
@@ -10,7 +21,7 @@ class ChatRequest(BaseModel):
 
     user_id: str = Field(max_length=128, pattern=r"^[a-zA-Z0-9_-]+$")
     message: str = Field(max_length=2000, min_length=1)
-    history: list[dict[str, str]] = Field(default_factory=list)
+    history: list[HistoryMessage] = Field(default_factory=list, max_length=50)
     explain: bool = False
 
 

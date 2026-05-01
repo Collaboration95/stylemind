@@ -149,4 +149,4 @@ def test_persona_signals_default_values_are_empty() -> None:
     assert signals.color_preferences == []
     assert signals.brand_mentions == []
     assert signals.sentiment_on_shown == {}
-    assert signals.signal_strength == 0.5
+    assert signals.signal_strength == 0.0

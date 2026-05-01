@@ -19,6 +19,28 @@ def get_optional_variable(name: str, default: str) -> str:
     return os.environ.get(name, default)
 
 
+def get_float_variable(name: str, default: float) -> float:
+    """Returns env var parsed as float, or default on missing/invalid value."""
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    try:
+        return float(raw)
+    except ValueError:
+        raise ValueError(f"Environment variable '{name}' must be a float, got {raw!r}") from None
+
+
+def get_int_variable(name: str, default: int) -> int:
+    """Returns env var parsed as int, or default on missing/invalid value."""
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        raise ValueError(f"Environment variable '{name}' must be an integer, got {raw!r}") from None
+
+
 @dataclass(frozen=True)
 class Neo4jConfig:
     """Neo4j database connection settings."""
@@ -44,14 +66,17 @@ class ChatLLMConfig:
     api_key: str
     model: str
     temperature: float
+    include_usage_in_stream: bool = True
 
     @classmethod
     def from_env(cls) -> ChatLLMConfig:
+        raw = get_optional_variable("CHAT_INCLUDE_USAGE_IN_STREAM", "true")
         return cls(
             base_url=get_optional_variable("CHAT_BASE_URL", "https://api.groq.com/openai/v1"),
             api_key=get_required_variable("CHAT_API_KEY"),
             model=get_optional_variable("CHAT_MODEL", "llama-3.3-70b-versatile"),
-            temperature=float(get_optional_variable("CHAT_TEMPERATURE", "0.7")),
+            temperature=get_float_variable("CHAT_TEMPERATURE", 0.7),
+            include_usage_in_stream=raw.lower() not in ("false", "0", "no"),
         )
 
 
@@ -85,7 +110,7 @@ class EmbeddingConfig:
         return cls(
             provider=get_optional_variable("EMBEDDING_PROVIDER", "local"),  # type: ignore[arg-type]
             model_name=get_optional_variable("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2"),
-            dimensions=int(get_optional_variable("EMBEDDING_DIMENSIONS", "384")),
+            dimensions=get_int_variable("EMBEDDING_DIMENSIONS", 384),
         )
 
 
@@ -130,10 +155,10 @@ class AppSettings:
     def from_env(cls) -> AppSettings:
         return cls(
             log_level=get_optional_variable("LOG_LEVEL", "INFO"),
-            vector_top_k=int(get_optional_variable("VECTOR_TOP_K", "10")),
-            persona_decay_rate=float(get_optional_variable("PERSONA_DECAY_RATE", "0.15")),
-            expected_signals_per_turn=float(get_optional_variable("EXPECTED_SIGNALS_PER_TURN", "3.0")),
-            min_similarity_threshold=float(get_optional_variable("MIN_SIMILARITY_THRESHOLD", "0.3")),
+            vector_top_k=get_int_variable("VECTOR_TOP_K", 10),
+            persona_decay_rate=get_float_variable("PERSONA_DECAY_RATE", 0.15),
+            expected_signals_per_turn=get_float_variable("EXPECTED_SIGNALS_PER_TURN", 3.0),
+            min_similarity_threshold=get_float_variable("MIN_SIMILARITY_THRESHOLD", 0.3),
         )
 
 

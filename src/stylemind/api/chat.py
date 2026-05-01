@@ -18,6 +18,20 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _sse_text(chunk: str) -> str:
+    """Encode a text chunk as a valid SSE data event, handling embedded newlines.
+
+    Per SSE spec, multiple data: fields within one event are concatenated with LF
+    on the client side, preserving newlines without breaking SSE framing.
+    """
+    return "".join(f"data: {line}\n" for line in chunk.split("\n")) + "\n"
+
+
+def _sse_json(payload: dict) -> str:
+    """Encode a structured payload as a named SSE 'json' event."""
+    return f"event: json\ndata: {orjson.dumps(payload).decode()}\n\n"
+
+
 async def _sse_stream(
     request: Request,
     chat_request: ChatRequest,
@@ -37,6 +51,9 @@ async def _sse_stream(
     if langfuse_context is not None:
         with contextlib.suppress(Exception):
             langfuse_context.update_current_trace(session_id=chat_request.user_id, user_id=chat_request.user_id)
+
+    # Convert HistoryMessage objects to plain dicts for downstream LLM clients
+    history_dicts = [m.model_dump() for m in chat_request.history]
 
     # 1. Get current persona (returns empty default on first turn, never None)
     persona: PersonaSnapshot = PersonaSnapshot()
@@ -79,11 +96,14 @@ async def _sse_stream(
         except Exception as exc:
             logger.warning("chat rerank failed user_id=%s error=%s", chat_request.user_id, exc)
 
-    # 4. Detect product interest → conditionally build outfit
+    # 4. Detect product interest → conditionally build outfit.
+    # Skip products explicitly disliked by the user — they should not anchor outfit building.
     outfit = None
     if generator is not None and outfit_builder is not None and reranked_products:
         try:
-            matched_product_id = generator.detect_product_interest(chat_request.message, reranked_products)
+            disliked_ids = set(persona.disliked_products)
+            interest_candidates = [p for p in reranked_products if p.product_id not in disliked_ids]
+            matched_product_id = generator.detect_product_interest(chat_request.message, interest_candidates)
             if matched_product_id:
                 try:
                     outfit = await asyncio.to_thread(
@@ -104,36 +124,41 @@ async def _sse_stream(
         try:
             async for chunk in generator.stream_response(
                 message=chat_request.message,
-                history=chat_request.history,
+                history=history_dicts,
                 retrieved_products=reranked_products,
                 outfit=outfit,
                 persona=persona_dict,
             ):
-                yield f"data: {chunk}\n\n"
+                yield _sse_text(chunk)
         except Exception as exc:
             logger.error("chat stream_response failed user_id=%s error=%s", chat_request.user_id, exc)
-            yield "data: Sorry, an error occurred while generating the response.\n\n"
+            yield _sse_text("Sorry, an error occurred while generating the response.")
     else:
-        yield "data: StyleMind generator not available.\n\n"
+        yield _sse_text("StyleMind generator not available.")
 
-    # 6. Emit structured JSON events (before [DONE])
+    # 6. Emit structured JSON events (before [DONE]).
+    # Uses named SSE event type 'json' to avoid collision with LLM text output.
     if reranked_products:
+        # Use final_score from rerank results when available, fall back to similarity_score
+        score_by_id = {r.product.product_id: r.final_score for r in rerank_results} if rerank_results else {}
         sources_payload = [
             {
                 "product_id": p.product_id,
                 "name": p.name,
                 "brand": p.brand,
                 "price_inr": p.price_inr,
-                "score": p.similarity_score,
+                "score": score_by_id.get(p.product_id, p.similarity_score),
             }
             for p in reranked_products
         ]
-        yield f"data: __JSON__{orjson.dumps({'sources': sources_payload}).decode()}\n\n"
+        with contextlib.suppress(Exception):
+            yield _sse_json({"sources": sources_payload})
 
     if chat_request.explain and rerank_results:
         explain_payload = [r.breakdown.to_dict() for r in rerank_results if r.breakdown is not None]
         if explain_payload:
-            yield f"data: __JSON__{orjson.dumps({'explain': explain_payload}).decode()}\n\n"
+            with contextlib.suppress(Exception):
+                yield _sse_json({"explain": explain_payload})
 
     # 6b. Extract and emit persona signals BEFORE [DONE] so the CLI receives them
     extracted_signals = None
@@ -144,7 +169,7 @@ async def _sse_stream(
             extracted_signals = await asyncio.to_thread(
                 inference_engine.extract_signals,
                 chat_request.message,
-                chat_request.history,
+                history_dicts,
                 shown_product_ids,
             )
 
@@ -160,7 +185,8 @@ async def _sse_stream(
                     "signal_strength": extracted_signals.signal_strength,
                 }
             }
-            yield f"data: __JSON__{orjson.dumps(signals_payload).decode()}\n\n"
+            with contextlib.suppress(Exception):
+                yield _sse_json(signals_payload)
         except Exception as exc:
             logger.warning("chat persona extraction failed user_id=%s error=%s", chat_request.user_id, exc)
 

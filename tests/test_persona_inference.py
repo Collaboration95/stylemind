@@ -173,7 +173,7 @@ def test_llm_failure_returns_empty_signals() -> None:
     assert signals.disliked_materials == []
     assert signals.mentioned_occasions == []
     assert signals.budget_signal is None
-    assert signals.signal_strength == pytest.approx(0.5)  # default value
+    assert signals.signal_strength == pytest.approx(0.0)  # default: 0.0 on failure means zero weight
 
 
 @pytest.mark.unit
