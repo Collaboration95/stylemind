@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 import logging
-import sys
 from pathlib import Path
 
 _ROOT = Path(__file__).parent.parent
-sys.path.insert(0, str(_ROOT))
 
 from dotenv import load_dotenv  # noqa: E402
 from neo4j import GraphDatabase  # noqa: E402

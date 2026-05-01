@@ -92,6 +92,7 @@ LIMIT 10
 # ---------------------------------------------------------------------------
 
 MAX_OUTFIT_ITEMS = 4
+MIN_OUTFIT_ITEMS = 1
 
 
 class OutfitBuilder:
@@ -155,8 +156,12 @@ class OutfitBuilder:
         anchor_category = anchor_row.get("category", "")
         diverse_candidates = self._diversify_by_category(candidates, anchor_category)
 
-        # 6. Select 2-4 paired items
+        # 6. Select paired items (min 1, max MAX_OUTFIT_ITEMS)
         selected = diverse_candidates[:MAX_OUTFIT_ITEMS]
+        if len(selected) < MIN_OUTFIT_ITEMS:
+            raise ValueError(
+                f"No coherent paired items found for product_id={product_id} (need ≥{MIN_OUTFIT_ITEMS}, got 0)"
+            )
 
         # Build output items
         items: list[OutfitItemSchema] = []
@@ -207,7 +212,7 @@ class OutfitBuilder:
 
     def _run_query(self, query: str, params: dict) -> list[dict]:  # type: ignore[type-arg]
         """Execute a Cypher query via the driver and return list of dicts."""
-        with self._driver.session() as session:
+        with self._driver.session(database="neo4j") as session:
             result = session.run(query, params)  # type: ignore[arg-type]
             return [record.data() for record in result]
 

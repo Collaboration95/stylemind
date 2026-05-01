@@ -1,8 +1,8 @@
 """SSE streaming client + persona fetch.
 
-The /chat endpoint emits text chunks interleaved with __JSON__-prefixed
-structured events. We yield text for st.write_stream-style consumption and
-capture the JSON payloads into a dict supplied by the caller.
+The /chat endpoint emits text chunks as unnamed SSE data events and structured
+payloads as named 'event: json' events. We yield text for st.write_stream-style
+consumption and capture the JSON payloads into a dict supplied by the caller.
 """
 
 from __future__ import annotations
@@ -41,17 +41,25 @@ def stream_chat(
         client.stream("POST", f"{base_url}/chat", json=payload) as resp,
     ):
         resp.raise_for_status()
+        event_type: str | None = None
         for raw in resp.iter_lines():
             line = raw.strip() if isinstance(raw, str) else raw.decode().strip()
-            if not line or not line.startswith("data: "):
+            if not line:
+                event_type = None
+                continue
+            if line.startswith("event: "):
+                event_type = line[7:].strip()
+                continue
+            if not line.startswith("data: "):
                 continue
             data = line[6:]
             if data == "[DONE]":
                 break
-            if data.startswith("__JSON__"):
+            if event_type == "json":
                 try:
-                    evt = json.loads(data[8:])
+                    evt = json.loads(data)
                 except json.JSONDecodeError:
+                    event_type = None
                     continue
                 if "sources" in evt:
                     captured["sources"].extend(evt["sources"])
@@ -59,6 +67,7 @@ def stream_chat(
                     captured["signals"] = evt["signals"]
                 if "explain" in evt:
                     captured["explain"].extend(evt["explain"])
+                event_type = None
             else:
                 yield data
 

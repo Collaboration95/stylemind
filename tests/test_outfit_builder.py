@@ -92,15 +92,12 @@ def _candidate_row(
 
 @pytest.mark.unit
 def test_coherence_rejects_season_clash():
-    """Anchor is SS-only; AW-only candidate must be excluded by the Cypher WHERE clause.
+    """Anchor is SS-only; AW-only candidate excluded by Cypher → no items → ValueError.
 
-    The coherence filter lives inside the Cypher queries. At the builder level we
-    verify that when the query returns NO candidates (because the DB enforced the
-    filter), the fallback is triggered and the outfit still builds gracefully (with
-    potentially zero items if the fallback also returns nothing).
+    With the minimum-outfit-size enforcement, build_outfit raises ValueError when
+    both the PAIRS_WITH and aesthetic-fallback queries return zero candidates so
+    the caller (API layer) can handle the case gracefully.
     """
-    # Simulate: PAIRS_WITH query returns [] (AW candidate filtered by Cypher)
-    # Fallback query also returns [] (no aesthetic overlap either)
     driver = _make_driver(
         [
             [_anchor_row(seasons=["SS"])],  # GET_ANCHOR_PRODUCT
@@ -109,17 +106,13 @@ def test_coherence_rejects_season_clash():
         ]
     )
     builder = OutfitBuilder(driver)
-    outfit = builder.build_outfit("P001", "user1")
-
-    assert isinstance(outfit, OutfitSuggestion)
-    # No coherent items available
-    assert outfit.items == []
-    assert outfit.season == "SS"
+    with pytest.raises(ValueError, match="No coherent paired items"):
+        builder.build_outfit("P001", "user1")
 
 
 @pytest.mark.unit
 def test_coherence_rejects_occasion_clash():
-    """Office anchor + Active-only candidate → candidate excluded (empty results)."""
+    """Office anchor + Active-only candidate excluded → no items → ValueError."""
     driver = _make_driver(
         [
             [_anchor_row(occasions=["Office"])],  # anchor
@@ -128,11 +121,8 @@ def test_coherence_rejects_occasion_clash():
         ]
     )
     builder = OutfitBuilder(driver)
-    outfit = builder.build_outfit("P001", "user1")
-
-    assert isinstance(outfit, OutfitSuggestion)
-    assert outfit.items == []
-    assert outfit.occasion == "Office"
+    with pytest.raises(ValueError, match="No coherent paired items"):
+        builder.build_outfit("P001", "user1")
 
 
 @pytest.mark.unit
@@ -246,11 +236,11 @@ def test_outfit_items_respect_max_count():
 def test_outfit_anchor_summary_populated():
     """Anchor ProductSummary fields are correctly populated."""
     anchor = _anchor_row(product_id="P001", name="Nice Top", brand="Zara", price_inr=2000)
+    paired = _candidate_row(product_id="P002", name="Paired Bottom")
     driver = _make_driver(
         [
             [anchor],
-            [],  # no PAIRS_WITH
-            [],  # no fallback
+            [paired],  # PAIRS_WITH returns one item so build succeeds
         ]
     )
     builder = OutfitBuilder(driver)

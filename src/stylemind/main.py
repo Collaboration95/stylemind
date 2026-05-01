@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import logging
 import time
 import uuid
@@ -102,6 +103,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
 
     # --- Shutdown ---
     neo4j_client.close()
+    if lf_client is not None:
+        with contextlib.suppress(Exception):
+            lf_client.flush()
     logger.info("lifespan shutdown complete")
 
 

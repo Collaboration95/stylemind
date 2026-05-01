@@ -118,7 +118,7 @@ class ProductReranker:
             ):
                 budget_boost = _BUDGET_BOOST * confidence
 
-            final_score = base_score + persona_boost - persona_penalty + budget_boost
+            final_score = max(0.0, min(1.0, base_score + persona_boost - persona_penalty + budget_boost))
 
             breakdown: ScoreBreakdown | None = None
             if explain:

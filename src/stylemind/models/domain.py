@@ -59,7 +59,7 @@ class PersonaSignals:
     color_preferences: list[str] = field(default_factory=list)
     brand_mentions: list[str] = field(default_factory=list)
     sentiment_on_shown: dict[str, str] = field(default_factory=dict)
-    signal_strength: float = 0.5
+    signal_strength: float = 0.0
 
     def __post_init__(self) -> None:
         if not (0.0 <= self.signal_strength <= 1.0):

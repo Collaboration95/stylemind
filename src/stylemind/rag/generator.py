@@ -150,13 +150,16 @@ class StyleMindGenerator:
             self._config.model,
         )
 
-        stream = await self._client.chat.completions.create(
-            model=self._config.model,
-            messages=messages,  # type: ignore[arg-type]
-            temperature=self._config.temperature,
-            stream=True,
-            stream_options={"include_usage": True},
-        )
+        create_kwargs: dict = {
+            "model": self._config.model,
+            "messages": messages,
+            "temperature": self._config.temperature,
+            "stream": True,
+        }
+        if self._config.include_usage_in_stream:
+            create_kwargs["stream_options"] = {"include_usage": True}
+
+        stream = await self._client.chat.completions.create(**create_kwargs)
 
         async for chunk in stream:
             if not chunk.choices:

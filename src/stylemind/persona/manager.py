@@ -7,6 +7,7 @@ from collections.abc import Callable
 from typing import Any
 
 from neo4j import Driver
+from neo4j.exceptions import Neo4jError
 
 from stylemind.models.domain import PersonaSignals
 from stylemind.models.schemas import PersonaSnapshot
@@ -82,15 +83,15 @@ SET sp.budget_signals = CASE
 END
 """
 
-# Single batched read — replaces the three-query N+1 pattern.
-# Uses WITH to collect each relationship type before the next OPTIONAL MATCH,
-# preventing row explosion from cartesian products.
+# Single batched read — one round trip replacing the N+1 pattern.
+# Each OPTIONAL MATCH is immediately collected into a list before the next
+# OPTIONAL MATCH to prevent cartesian-product row explosion.
 GET_PERSONA_ALL = """
 MATCH (sp:StylePersona {user_id: $user_id})
 OPTIONAL MATCH (sp)-[rp:PREFERS]->(a:Aesthetic)
+WITH sp, collect(DISTINCT {aesthetic: a.name, weight: rp.weight, last_seen: rp.last_seen_turn}) AS preferences
 OPTIONAL MATCH (sp)-[rd:DISLIKES]->(dm:Material)
-WITH sp,
-     collect(DISTINCT {aesthetic: a.name, weight: rp.weight, last_seen: rp.last_seen_turn}) AS preferences,
+WITH sp, preferences,
      collect(DISTINCT {material: dm.name, weight: rd.weight, last_seen: rd.last_seen_turn}) AS dislikes
 OPTIONAL MATCH (sp)-[ro:INTERESTED_IN]->(o:Occasion)
 WITH sp, preferences, dislikes,
@@ -105,17 +106,20 @@ RETURN sp.turn_count AS turn_count,
 """
 
 
+_TRANSIENT_ERRORS = (Neo4jError, OSError, TimeoutError)
+
+
 def _retry[T](
     fn: Callable[[], T],
     attempts: int = _RETRY_ATTEMPTS,
     base_delay: float = _RETRY_BASE_DELAY,
 ) -> T:
-    """Call fn() with exponential backoff on transient exceptions."""
+    """Call fn() with exponential backoff on transient Neo4j/network errors only."""
     last_exc: Exception | None = None
     for attempt in range(attempts):
         try:
             return fn()
-        except Exception as exc:
+        except _TRANSIENT_ERRORS as exc:
             last_exc = exc
             if attempt < attempts - 1:
                 delay = base_delay * (2**attempt)
@@ -186,9 +190,11 @@ class PersonaManager:
         decayed_occasions.sort(key=lambda x: x[1], reverse=True)
         top_occasions = [name for name, _ in decayed_occasions[:3]]
 
-        # Budget tier: weighted accumulation (entries stored as "signal:weight" strings)
+        # Budget tier: weighted accumulation (entries stored as "signal:weight" strings).
+        # Tiebreak by recency (last position in the list = most recent signal).
         budget_weights: dict[str, float] = {}
-        for entry in budget_signals:
+        budget_last_seen: dict[str, int] = {}
+        for idx, entry in enumerate(budget_signals):
             entry_str = str(entry)
             if ":" in entry_str:
                 sig, w_str = entry_str.rsplit(":", 1)
@@ -199,7 +205,10 @@ class PersonaManager:
             else:
                 sig, w = entry_str, 1.0
             budget_weights[sig] = budget_weights.get(sig, 0.0) + w
-        budget_tier: str | None = max(budget_weights, key=lambda k: budget_weights[k]) if budget_weights else None
+            budget_last_seen[sig] = idx
+        budget_tier: str | None = (
+            max(budget_weights, key=lambda k: (budget_weights[k], budget_last_seen[k])) if budget_weights else None
+        )
 
         confidence = self._confidence_score(decayed_weights, turn_count)
 
