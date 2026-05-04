@@ -9,7 +9,7 @@
     StyleMind combines a Neo4j knowledge graph, vector similarity search, and an LLM pipeline to deliver persona-aware outfit recommendations that improve with every message.
   </p>
   <p>
-    Watch Demo [here](https://youtu.be/bT5OmNtwX_0)
+    Watch Demo ![here](https://youtu.be/bT5OmNtwX_0)
   </p>
 </div>
 
